@@ -1,0 +1,7 @@
+{
+  "name": "ConsulaRO",
+  "description": "Aplicație pentru diaspora românească - servicii consulare, știri și evenimente.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
