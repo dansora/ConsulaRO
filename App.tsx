@@ -1192,14 +1192,14 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
 
     // Upload to 'profile_images' bucket (updated)
     const { error: uploadError } = await supabase.storage
-      .from('profile_images')
+      .from('avatars')
       .upload(filePath, file, { upsert: true });
 
     if (uploadError) {
       alert('Eroare la încărcare imagine: ' + uploadError.message);
     } else {
       // Get public URL
-      const { data: { publicUrl } } = supabase.storage.from('profile_images').getPublicUrl(filePath);
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
       // Update form data state with new image URL
       setFormData(prev => ({ ...prev, avatarUrl: publicUrl })); // Use avatarUrl
     }
