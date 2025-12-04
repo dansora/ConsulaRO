@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Menu, X, Home, Book, Send, HelpCircle, Settings, User, 
   LogOut, Globe, Moon, Sun, Monitor, Camera, Bell, Calendar,
-  ChevronRight, ChevronLeft, Image as ImageIcon, FileText, Users, Flag, FileCheck, Mail, BookOpen, UserCheck, MoreHorizontal, Search, File
+  ChevronRight, ChevronLeft, Image as ImageIcon, FileText, Users, Flag, FileCheck, Mail, BookOpen, UserCheck, MoreHorizontal, Search, File as FileIcon
 } from 'lucide-react';
 import { 
   LanguageCode, UserProfile, AppTheme, TextSize, ViewState, 
@@ -88,8 +88,8 @@ const Header = ({
       <div className="absolute inset-0 bg-white/20 backdrop-blur-[2px]"></div>
 
       <div className="relative flex items-center justify-between px-4 h-full">
-        {/* Left: Logo/Icon */}
-        <div className="flex items-center space-x-2 z-10 w-24">
+        {/* Left: Logo/Icon + Search */}
+        <div className="flex items-center space-x-3 z-10 w-auto">
            {/* APP LOGO IMPLEMENTATION */}
            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md overflow-hidden border-2 border-white/50">
              {/* Uses local logo.png, falls back to coat of arms if missing */}
@@ -98,10 +98,18 @@ const Header = ({
                alt="App Logo" 
                className="w-full h-full object-cover"
                onError={(e) => {
-                 (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Coat_of_arms_of_Romania.svg/200px-Coat_of_arms_of_Romania.svg.png';
+                 // Use a reliable SVG from Wikimedia as fallback
+                 (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/7/70/Coat_of_arms_of_Romania.svg';
                }}
              />
            </div>
+           
+           {/* Search Button (Moved to Left) */}
+           {isLoggedIn && (
+            <button onClick={onSearchClick} className="text-white bg-black/20 hover:bg-black/30 transition-colors p-2 rounded-full">
+              <Search className="w-5 h-5" />
+            </button>
+           )}
         </div>
 
         {/* Center: Title (Absolutely Centered) */}
@@ -111,13 +119,6 @@ const Header = ({
 
         {/* Right: Controls */}
         <div className="flex items-center space-x-2 z-10 justify-end w-auto">
-          {/* Search Button */}
-          {isLoggedIn && (
-            <button onClick={onSearchClick} className="text-white hover:text-gray-200 transition-colors p-1">
-              <Search className="w-5 h-5" />
-            </button>
-          )}
-
           {/* Language Dropdown */}
           <div className="relative group">
             <button 
@@ -215,7 +216,6 @@ const SearchOverlay = ({
     if (!query.trim()) return null;
     const lowerQuery = query.toLowerCase();
     
-    // Updated filtering for new subServices structure (which are now objects)
     const services = SERVICE_CATEGORIES.filter(s => 
       s.title.toLowerCase().includes(lowerQuery) || 
       s.subServices.some(sub => sub.name.toLowerCase().includes(lowerQuery))
@@ -652,7 +652,7 @@ const HomeScreen = ({ t }: { t: (k:string)=>string }) => {
              {/* MAE Logo Placeholder - RESIZED */}
              <div className="w-24 h-24 flex items-center justify-center">
                 <img 
-                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Coat_of_arms_of_Romania.svg/800px-Coat_of_arms_of_Romania.svg.png" 
+                  src="https://upload.wikimedia.org/wikipedia/commons/7/70/Coat_of_arms_of_Romania.svg" 
                   alt="MAE" 
                   className="w-full h-full object-contain opacity-90"
                 />
@@ -1102,27 +1102,62 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
     }
   
     try {
+      const updates = {
+          id: session.user.id,
+          first_name: formData.firstName || null,
+          last_name: formData.lastName || null,
+          username: formData.username || null,
+          phone: formData.phone || null,
+          address: formData.address || null,
+          city: formData.city || null,
+          country: formData.country || null,
+          postal_code: formData.postalCode || null,
+          image: formData.image || null, // Updated to use 'image' column
+          updated_at: new Date().toISOString()
+      };
+
       const { error } = await supabase
         .from('profiles')
-        .upsert({
-          id: session.user.id,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          username: formData.username,
-          phone: formData.phone,
-          address: formData.address,
-          city: formData.city,
-          country: formData.country,
-          postal_code: formData.postalCode,
-          image: formData.image, // Updated to use 'image' column
-          updated_at: new Date().toISOString()
-        });
+        .upsert(updates, { onConflict: 'id' });
   
       if (error) {
-        console.error('Supabase Error:', error);
-        // JSON stringify the error to ensure object details are visible in the alert
-        const errMsg = error.message || error.details || JSON.stringify(error);
-        alert(`${t('profile_error')} (${errMsg})`);
+        // Force string representation for console
+        console.error('Supabase Error Debug:', JSON.stringify(error, null, 2));
+        
+        let errorMsg = '';
+        
+        // Type assertion for PostgrestError-like structure
+        const pgError = error as any;
+
+        // prioritize specific fields
+        if (pgError.message) {
+            errorMsg += `Mesaj: ${pgError.message}`;
+        }
+        if (pgError.details) {
+            errorMsg += `\nDetalii: ${pgError.details}`;
+        }
+        if (pgError.hint) {
+            errorMsg += `\nSugestie: ${pgError.hint}`;
+        }
+        if (pgError.code) {
+            errorMsg += `\nCod: ${pgError.code}`;
+        }
+
+        // Add hint for missing columns
+        if (pgError.code === 'PGRST204') {
+             errorMsg += "\n\n(Această eroare indică faptul că baza de date nu a fost actualizată. Vă rugăm să rulați codul din db_schema.sql în Supabase SQL Editor.)";
+        }
+
+        // Fallback if no specific fields found
+        if (!errorMsg) {
+             try {
+               errorMsg = JSON.stringify(error);
+             } catch (e) {
+               errorMsg = "Eroare necunoscută (nu se poate parsa)";
+             }
+        }
+
+        alert(`${t('profile_error')}\n\n${errorMsg}`);
       } else {
         setUser(formData);
         setIsEditing(false);
@@ -1130,7 +1165,7 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
       }
     } catch (err: any) {
       console.error('Unexpected Error:', err);
-      alert("A apărut o eroare neașteptată.");
+      alert("A apărut o eroare neașteptată: " + (err.message || String(err)));
     } finally {
       setSaving(false);
     }
