@@ -331,44 +331,45 @@ const App = () => {
 
   const loadUserProfile = async (userId: string, email: string) => {
     try {
-      // Use maybeSingle to avoid 406 error if multiple rows exist (shouldn't happen with id PK)
-      // or if 0 rows exist.
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+        // --- Operatiunea SELECT (pentru citirea datelor) ---
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle();
+            
+        // Logica de inserare (doar daca nu exista)
+        if (!data) {
+             // In loc de INSERT simplu, trimitem datele pe care le avem.
+             // Folosim UPSET pentru a insera/actualiza intr-un singur pas
+             // Daca politicile sunt corecte, acest UPSET va crea rândul nou.
 
-      if (data) {
-         // Map DB columns to UserProfile
-         setUser({
-           firstName: data.first_name || '',
-           lastName: data.last_name || '',
-           email: email,
-           phone: data.phone || '',
-           address: data.address || '',
-           city: data.city || '',
-           country: data.country || '',
-           county: data.county || '', // New field
-           postCode: data.post_code || '', // Updated column name
-           username: data.username || '',
-           avatarUrl: data.avatar_url || null // Updated column name
-         });
-      } else {
-        // Create profile if it doesn't exist (though trigger usually handles this)
-        // We only insert if we are sure it doesn't exist to avoid duplicates if trigger is slow
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert([{ id: userId }]); // Only need ID, triggers usually fill rest or they stay null
-          
-        if (!insertError) {
-           setUser(prev => ({ ...prev, email }));
+             const initialProfileData = {
+                 id: userId,
+                 email: email, // O coloana utila, desi nu e PK
+                 // Setează minimum de coloane necesare, restul pot fi NULL
+             };
+
+             const { error: upsertError } = await supabase
+                .from('profiles')
+                .upsert([initialProfileData], { onConflict: 'id' }); 
+                // onConflict: 'id' asigura ca va face INSERT daca nu gaseste ID-ul
+
+             if (upsertError) {
+                 console.error("Eroare la UPSET profil:", upsertError);
+                 // Dacă aici apare 42501, e clar o problemă de RLS pe server
+                 return;
+             }
         }
-      }
+        
+        // ... Logica de mapare a datelor (similar cu ce aveai) ...
+        // Rulează din nou SELECT-ul după upsert sau actualizează starea direct.
+        // Pentru simplitate, să presupunem că rămâi la logica ta de SELECT *
+
     } catch (e) {
-      console.error("Error loading profile", e);
+        console.error("Eroare generala la incarcarea/crearea profilului", e);
     }
-  };
+};
 
   const handleLogin = (userId: string, email: string) => {
     // Auth listener handles the rest
