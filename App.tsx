@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Menu, X, Home, Book, Send, HelpCircle, Settings, User, 
   LogOut, Globe, Moon, Sun, Monitor, Camera, Bell, Calendar,
-  ChevronRight, ChevronLeft, Image as ImageIcon, FileText, Users, Flag, FileCheck, Mail, BookOpen, UserCheck, MoreHorizontal, Search, File as FileIcon
+  ChevronRight, ChevronLeft, Image as ImageIcon, FileText, Users, Flag, Globe as GlobeIcon, FileCheck, Mail, BookOpen, UserCheck, MoreHorizontal, Search, File as FileIcon
 } from 'lucide-react';
 import { 
   LanguageCode, UserProfile, AppTheme, TextSize, ViewState, 
@@ -20,7 +20,7 @@ import { supabase } from './lib/supabaseClient';
 
 // --- Icons Map Helper ---
 const IconMap: Record<string, React.ElementType> = {
-  FileText, Users, Flag, Globe, FileCheck, Mail, BookOpen, UserCheck, MoreHorizontal
+  FileText, Users, Flag, Globe: GlobeIcon, FileCheck, Mail, BookOpen, UserCheck, MoreHorizontal
 };
 
 // --- Translation Hook ---
@@ -126,7 +126,7 @@ const Header = ({
               onClick={() => setMenuOpen(!menuOpen)}
             >
               <span className="text-xs">{currentLang}</span>
-              <Globe className="w-4 h-4" />
+              <GlobeIcon className="w-4 h-4" />
             </button>
             {/* Simple dropdown */}
             {menuOpen && (
@@ -183,7 +183,7 @@ const BottomNav = ({ currentView, setView, t }: { currentView: ViewState, setVie
               className={`flex flex-col items-center justify-center w-full h-full transition-colors ${isActive ? 'text-ro-blue bg-blue-100' : 'text-gray-400 hover:text-ro-blue'}`}
             >
               <Icon className={`w-5 h-5 mb-1 ${isActive ? 'stroke-[2.5px]' : ''}`} />
-              <span className="text-[10px] font-bold">{item.label}</span>
+              <span className="text-xs font-bold">{item.label}</span>
             </button>
           );
         })}
@@ -281,7 +281,7 @@ const App = () => {
   const [textSize, setTextSize] = useState<TextSize>(TextSize.MEDIUM);
   const [theme, setTheme] = useState<AppTheme>(AppTheme.AUTO);
   const [user, setUser] = useState<UserProfile>({
-    firstName: '', lastName: '', email: '', phone: '', address: '', city: '', country: '', username: '', image: null, postalCode: ''
+    firstName: '', lastName: '', email: '', phone: '', address: '', city: '', country: '', county: '', username: '', avatarUrl: null, postCode: ''
   });
   
   const [searchOpen, setSearchOpen] = useState(false);
@@ -305,7 +305,7 @@ const App = () => {
         }
       } else {
         setIsLoggedIn(false);
-        setUser({ firstName: '', lastName: '', email: '', phone: '', address: '', city: '', country: '', username: '', image: null, postalCode: '' });
+        setUser({ firstName: '', lastName: '', email: '', phone: '', address: '', city: '', country: '', county: '', username: '', avatarUrl: null, postCode: '' });
         if (view !== 'SPLASH') {
           setView('AUTH');
         }
@@ -340,6 +340,7 @@ const App = () => {
         .maybeSingle();
 
       if (data) {
+         // Map DB columns to UserProfile
          setUser({
            firstName: data.first_name || '',
            lastName: data.last_name || '',
@@ -348,16 +349,17 @@ const App = () => {
            address: data.address || '',
            city: data.city || '',
            country: data.country || '',
-           postalCode: data.postal_code || '',
+           county: data.county || '', // New field
+           postCode: data.post_code || '', // Updated column name
            username: data.username || '',
-           image: data.image || null 
+           avatarUrl: data.avatar_url || null // Updated column name
          });
       } else {
         // Create profile if it doesn't exist (though trigger usually handles this)
         // We only insert if we are sure it doesn't exist to avoid duplicates if trigger is slow
         const { error: insertError } = await supabase
           .from('profiles')
-          .insert([{ id: userId, email: email }]);
+          .insert([{ id: userId }]); // Only need ID, triggers usually fill rest or they stay null
           
         if (!insertError) {
            setUser(prev => ({ ...prev, email }));
@@ -1102,6 +1104,7 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
     }
   
     try {
+      // Map frontend fields to backend columns
       const updates = {
           id: session.user.id,
           first_name: formData.firstName || null,
@@ -1111,8 +1114,9 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
           address: formData.address || null,
           city: formData.city || null,
           country: formData.country || null,
-          postal_code: formData.postalCode || null,
-          image: formData.image || null, // Updated to use 'image' column
+          county: formData.county || null, // New field mapped to county
+          post_code: formData.postCode || null, // Updated map to post_code
+          avatar_url: formData.avatarUrl || null, // Updated map to avatar_url
           updated_at: new Date().toISOString()
       };
 
@@ -1147,6 +1151,11 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
         if (pgError.code === 'PGRST204') {
              errorMsg += "\n\n(Această eroare indică faptul că baza de date nu a fost actualizată. Vă rugăm să rulați codul din db_schema.sql în Supabase SQL Editor.)";
         }
+        
+        // Handle Invalid Type error (BigInt vs UUID)
+        if (pgError.code === '22P02') {
+             errorMsg += "\n\n(Această eroare indică o problemă de tip de date în baza de date. ID-ul profilului este definit greșit ca număr (bigint) în loc de UUID. Vă rugăm să rulați scriptul SQL de reparare.)";
+        }
 
         // Fallback if no specific fields found
         if (!errorMsg) {
@@ -1180,17 +1189,18 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
     const fileName = `${authUser.id}-${Date.now()}.${fileExt}`;
     const filePath = `${fileName}`;
 
+    // Upload to 'profile_images' bucket (updated)
     const { error: uploadError } = await supabase.storage
-      .from('avatars')
+      .from('profile_images')
       .upload(filePath, file, { upsert: true });
 
     if (uploadError) {
       alert('Eroare la încărcare imagine: ' + uploadError.message);
     } else {
       // Get public URL
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      const { data: { publicUrl } } = supabase.storage.from('profile_images').getPublicUrl(filePath);
       // Update form data state with new image URL
-      setFormData(prev => ({ ...prev, image: publicUrl }));
+      setFormData(prev => ({ ...prev, avatarUrl: publicUrl })); // Use avatarUrl
     }
   };
 
@@ -1274,8 +1284,8 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
          <div className="flex flex-col items-center mb-6">
            <div className="relative w-24 h-24 mb-4">
              <div className="w-24 h-24 rounded-full bg-gray-200 overflow-hidden border-4 border-white shadow-lg">
-               {formData.image ? (
-                 <img src={formData.image} alt="Profile" className="w-full h-full object-cover" />
+               {formData.avatarUrl ? (
+                 <img src={formData.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
                ) : (
                  <User className="w-full h-full p-4 text-gray-400" />
                )}
@@ -1337,13 +1347,19 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
                 <input disabled={!isEditing} value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white' : 'bg-gray-50'}`} placeholder={t('lbl_city')} />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">{t('lbl_postal')}</label>
-                <input disabled={!isEditing} value={formData.postalCode} onChange={e => setFormData({...formData, postalCode: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white' : 'bg-gray-50'}`} placeholder={t('lbl_postal')} />
+                <label className="text-xs text-gray-500 block mb-1">{t('lbl_county')}</label>
+                <input disabled={!isEditing} value={formData.county || ''} onChange={e => setFormData({...formData, county: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white' : 'bg-gray-50'}`} placeholder={t('lbl_county')} />
               </div>
            </div>
-           <div>
-             <label className="text-xs text-gray-500 block mb-1">{t('lbl_country')}</label>
-             <input disabled={!isEditing} value={formData.country} onChange={e => setFormData({...formData, country: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white' : 'bg-gray-50'}`} placeholder={t('lbl_country')} />
+           <div className="grid grid-cols-2 gap-4">
+              <div>
+                 <label className="text-xs text-gray-500 block mb-1">{t('lbl_country')}</label>
+                 <input disabled={!isEditing} value={formData.country} onChange={e => setFormData({...formData, country: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white' : 'bg-gray-50'}`} placeholder={t('lbl_country')} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">{t('lbl_postal')}</label>
+                <input disabled={!isEditing} value={formData.postCode || ''} onChange={e => setFormData({...formData, postCode: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white' : 'bg-gray-50'}`} placeholder={t('lbl_postal')} />
+              </div>
            </div>
          </div>
 

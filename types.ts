@@ -8,10 +8,11 @@ export interface UserProfile {
   phone: string;
   address: string;
   city: string;
+  county?: string; // New field
   country: string;
-  postalCode?: string;
+  postCode?: string; // Renamed from postalCode
   username: string;
-  image: string | null; // Changed from avatarUrl to match DB column 'image'
+  avatarUrl: string | null; // Renamed from image to match DB column avatar_url logic
 }
 
 export interface Announcement {
