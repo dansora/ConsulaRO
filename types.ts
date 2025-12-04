@@ -9,8 +9,9 @@ export interface UserProfile {
   address: string;
   city: string;
   country: string;
+  postalCode?: string;
   username: string;
-  avatarUrl: string | null;
+  image: string | null; // Changed from avatarUrl to match DB column 'image'
 }
 
 export interface Announcement {
@@ -31,11 +32,16 @@ export interface EventItem {
   imageUrl: string;
 }
 
+export interface SubService {
+  name: string;
+  url: string;
+}
+
 export interface ServiceCategory {
   id: string;
   title: string;
   iconName: string;
-  subServices: string[];
+  subServices: SubService[];
 }
 
 export interface FaqCategory {
@@ -57,7 +63,7 @@ export enum TextSize {
   XLARGE = 'text-xl'
 }
 
-export type ViewState = 'SPLASH' | 'AUTH' | 'HOME' | 'SERVICES' | 'SEND_DOCS' | 'FAQ' | 'SETTINGS' | 'PROFILE';
+export type ViewState = 'SPLASH' | 'AUTH' | 'HOME' | 'SERVICES' | 'SEND_DOCS' | 'EVENTS_LIST' | 'FAQ' | 'SETTINGS' | 'PROFILE';
 
 export interface NotificationPreferences {
   enabled: boolean;
