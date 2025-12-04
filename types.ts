@@ -1,18 +1,22 @@
 
 export type LanguageCode = 'RO' | 'EN' | 'IT' | 'ES' | 'FR' | 'DE' | 'PT' | 'HU' | 'TR';
 
+export type UserRole = 'user' | 'admin' | 'super_admin';
+
 export interface UserProfile {
+  id?: string;
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
   address: string;
   city: string;
-  county?: string; // New field
+  county?: string;
   country: string;
-  postCode?: string; // Renamed from postalCode
+  postCode?: string;
   username: string;
-  avatarUrl: string | null; // Renamed from image to match DB column avatar_url logic
+  avatarUrl: string | null;
+  role?: UserRole; // New field for role-based access
 }
 
 export interface Announcement {
@@ -21,7 +25,8 @@ export interface Announcement {
   shortDescription: string;
   fullDescription: string;
   imageUrl: string;
-  date: string;
+  date: string; // ISO Date string YYYY-MM-DD
+  active: boolean;
 }
 
 export interface EventItem {
@@ -31,6 +36,18 @@ export interface EventItem {
   date: string;
   description: string;
   imageUrl: string;
+  active: boolean;
+}
+
+export interface UserDocument {
+  id: string;
+  user_id: string;
+  user_email: string;
+  user_name: string;
+  file_name: string;
+  file_url: string;
+  file_type: 'image' | 'pdf';
+  created_at: string;
 }
 
 export interface SubService {
@@ -64,7 +81,7 @@ export enum TextSize {
   XLARGE = 'text-xl'
 }
 
-export type ViewState = 'SPLASH' | 'AUTH' | 'HOME' | 'SERVICES' | 'SEND_DOCS' | 'EVENTS_LIST' | 'FAQ' | 'SETTINGS' | 'PROFILE';
+export type ViewState = 'SPLASH' | 'AUTH' | 'HOME' | 'SERVICES' | 'SEND_DOCS' | 'EVENTS_LIST' | 'FAQ' | 'SETTINGS' | 'PROFILE' | 'ADMIN';
 
 export interface NotificationPreferences {
   enabled: boolean;

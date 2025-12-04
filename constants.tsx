@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { Announcement, EventItem, FaqCategory, LanguageCode, ServiceCategory } from './types';
 import { 
@@ -265,7 +266,8 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     shortDescription: 'Informații privind organizarea secțiilor de votare în străinătate.',
     fullDescription: 'Ministerul Afacerilor Externe informează cetățenii români din străinătate cu privire la organizarea alegerilor prezidențiale din anul 2024. Vă rugăm să verificați lista secțiilor de votare disponibile în țara dumneavoastră de reședință. Este necesar un act de identitate valabil.',
     imageUrl: 'https://picsum.photos/600/400?random=1',
-    date: '2024-10-15'
+    date: '2024-10-15',
+    active: true
   },
   {
     id: '2',
@@ -273,7 +275,8 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     shortDescription: 'Modificări de program în perioada sărbătorilor de iarnă.',
     fullDescription: 'În perioada 24 Decembrie - 3 Ianuarie, activitatea cu publicul va fi suspendată, cu excepția cazurilor de urgență majoră (decese, accidente). Vă mulțumim pentru înțelegere.',
     imageUrl: 'https://picsum.photos/600/400?random=2',
-    date: '2024-12-01'
+    date: '2024-12-01',
+    active: true
   },
   {
     id: '3',
@@ -281,7 +284,8 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     shortDescription: 'Lista consulatelor itinerante pentru luna viitoare.',
     fullDescription: 'Echipele consulare mobile se vor deplasa în următoarele orașe: Lyon (Franța), Birmingham (UK), și Dortmund (Germania). Programările se fac exclusiv online.',
     imageUrl: 'https://picsum.photos/600/400?random=3',
-    date: '2024-11-10'
+    date: '2024-11-10',
+    active: true
   },
    {
     id: '4',
@@ -289,7 +293,8 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     shortDescription: 'Actualizare cuantum taxe începând cu 1 ianuarie.',
     fullDescription: 'Vă informăm că începând cu data de 1 ianuarie, anumite taxe consulare vor fi actualizate conform noilor reglementări legislative.',
     imageUrl: 'https://picsum.photos/600/400?random=10',
-    date: '2024-12-15'
+    date: '2024-12-15',
+    active: true
   },
   {
     id: '5',
@@ -297,7 +302,8 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     shortDescription: 'Toate serviciile necesită programare prealabilă.',
     fullDescription: 'Pentru a evita aglomerația și a reduce timpii de așteptare, toate serviciile consulare se efectuează exclusiv pe bază de programare prin portalul econsulat.ro.',
     imageUrl: 'https://picsum.photos/600/400?random=11',
-    date: '2024-09-20'
+    date: '2024-09-20',
+    active: true
   }
 ];
 
@@ -308,7 +314,8 @@ export const MOCK_EVENTS: EventItem[] = [
     location: 'Institutul Cultural Român',
     date: '2024-08-31',
     description: 'Sărbătorim împreună Ziua Limbii Române cu un recital de poezie și un concert de muzică clasică. Intrarea este liberă.',
-    imageUrl: 'https://picsum.photos/600/400?random=4'
+    imageUrl: 'https://picsum.photos/600/400?random=4',
+    active: true
   },
   {
     id: '2',
@@ -316,7 +323,8 @@ export const MOCK_EVENTS: EventItem[] = [
     location: 'Ambasada României',
     date: '2024-09-15',
     description: 'Vă invităm la o discuție deschisă despre problemele comunității românești. Vor fi prezenți reprezentanți ai MAE.',
-    imageUrl: 'https://picsum.photos/600/400?random=5'
+    imageUrl: 'https://picsum.photos/600/400?random=5',
+    active: true
   },
   {
     id: '3',
@@ -324,7 +332,8 @@ export const MOCK_EVENTS: EventItem[] = [
     location: 'Centrul Comunitar',
     date: '2025-03-01',
     description: 'Veniți să sărbătorim venirea primăverii cu mărțișoare tradiționale, muzică populară și bucate românești.',
-    imageUrl: 'https://picsum.photos/600/400?random=6'
+    imageUrl: 'https://picsum.photos/600/400?random=6',
+    active: true
   },
   {
     id: '4',
@@ -332,7 +341,8 @@ export const MOCK_EVENTS: EventItem[] = [
     location: 'Cinema Central',
     date: '2024-11-20',
     description: 'Proiecții ale celor mai noi filme românești premiate internațional. Sesiuni de Q&A cu regizorii.',
-    imageUrl: 'https://picsum.photos/600/400?random=7'
+    imageUrl: 'https://picsum.photos/600/400?random=7',
+    active: true
   },
   {
     id: '5',
@@ -340,7 +350,8 @@ export const MOCK_EVENTS: EventItem[] = [
     location: 'Biblioteca Românească',
     date: '2024-10-05',
     description: 'Un atelier creativ pentru copiii de toate vârstele, dedicat promovării tradițiilor românești prin artă.',
-    imageUrl: 'https://picsum.photos/600/400?random=8'
+    imageUrl: 'https://picsum.photos/600/400?random=8',
+    active: true
   }
 ];
 
