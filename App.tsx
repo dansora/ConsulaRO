@@ -1169,7 +1169,10 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
 
         alert(`${t('profile_error')}\n\n${errorMsg}`);
       } else {
-        setUser(formData);
+        setUser(prevUser => ({ 
+            ...prevUser, 
+            ...formData 
+        }));
         setIsEditing(false);
         alert(t('profile_success'));
       }
