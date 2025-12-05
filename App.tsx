@@ -112,7 +112,7 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
   );
 };
 
-const Header = ({ currentLang, setLang, onProfileClick, onSettingsClick, onSearchClick, onAdminClick, isLoggedIn, userRole }: any) => {
+const Header = ({ currentLang, setLang, onProfileClick, onSettingsClick, onSearchClick, isLoggedIn, userRole }: any) => {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <header className="sticky top-0 z-40 w-full shadow-md h-16">
@@ -129,7 +129,6 @@ const Header = ({ currentLang, setLang, onProfileClick, onSettingsClick, onSearc
             <h1 className="text-2xl font-bold text-white drop-shadow-md tracking-wide whitespace-nowrap">ConsulaRO</h1>
         </div>
         <div className="flex items-center space-x-2 z-10 justify-end w-auto">
-          {(userRole === 'admin' || userRole === 'super_admin') && ( <button onClick={onAdminClick} className="text-white bg-red-600/80 hover:bg-red-700 p-1.5 rounded-full shadow-sm mr-1"><Shield className="w-4 h-4" /></button> )}
           <div className="relative group">
             <button className="flex items-center space-x-1 text-white font-medium bg-black/20 px-2 py-1 rounded" onClick={() => setMenuOpen(!menuOpen)}>
               <span className="text-xs">{currentLang}</span><GlobeIcon className="w-4 h-4" />
@@ -405,7 +404,7 @@ const SettingsScreen = ({ textSize, setTextSize, theme, setTheme, setView, notif
 };
 
 // --- PROFILE SCREEN ---
-const ProfileScreen = ({ user, setUser, onLogout, t, onError }: any) => {
+const ProfileScreen = ({ user, setUser, onLogout, t, onError, onViewChange }: any) => {
    const [isEditing, setIsEditing] = useState(false);
    const [tempUser, setTempUser] = useState(user);
    const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -476,6 +475,9 @@ const ProfileScreen = ({ user, setUser, onLogout, t, onError }: any) => {
                <input id="avatar-upload" type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files && handleAvatarUpload(e.target.files[0])} />
            </div>
            <h2 className="text-xl font-bold text-gray-800">{user.firstName} {user.lastName}</h2>
+           {(user.role === 'admin' || user.role === 'super_admin') && (
+              <Button onClick={() => onViewChange('ADMIN')} className="mt-2 text-xs flex items-center gap-2 bg-ro-blue"><Shield className="w-3 h-3"/> Panou Admin</Button>
+           )}
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -503,6 +505,86 @@ const ProfileScreen = ({ user, setUser, onLogout, t, onError }: any) => {
         </div>
      </div>
    );
+};
+
+const SendDocsScreen = ({ user, t, onError }: any) => {
+    const [file, setFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [message, setMessage] = useState('');
+    const [uploading, setUploading] = useState(false);
+    const [showCamera, setShowCamera] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    const startCamera = async () => { setShowCamera(true); try { const stream = await navigator.mediaDevices.getUserMedia({ video: true }); if (videoRef.current) videoRef.current.srcObject = stream; } catch(e) { alert('Err Camera'); setShowCamera(false); } };
+    const takePhoto = () => { if (videoRef.current) { const canvas = document.createElement('canvas'); canvas.width = videoRef.current.videoWidth; canvas.height = videoRef.current.videoHeight; canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0); canvas.toBlob(blob => { if(blob) { const f = new File([blob], "photo.jpg", { type: "image/jpeg" }); setFile(f); setPreviewUrl(URL.createObjectURL(blob)); } }); const stream = videoRef.current.srcObject as MediaStream; stream?.getTracks().forEach(t => t.stop()); setShowCamera(false); } };
+    
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const f = e.target.files[0];
+            setFile(f);
+            if (f.type.startsWith('image/')) setPreviewUrl(URL.createObjectURL(f));
+            else setPreviewUrl(null);
+        }
+    };
+
+    const handleSend = async () => {
+        if (!file || !user) return;
+        setUploading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+            const { error: uploadErr } = await supabase.storage.from('documents').upload(fileName, file);
+            if (uploadErr) throw uploadErr;
+            const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(fileName);
+            
+            const { error: dbErr } = await supabase.from('user_documents').insert({
+                user_id: user.id,
+                user_email: user.email,
+                user_name: `${user.firstName} ${user.lastName}`,
+                file_name: file.name,
+                file_url: publicUrl,
+                file_type: file.type.startsWith('image/') ? 'image' : 'pdf',
+                message: message
+            });
+            if (dbErr) throw dbErr;
+            alert('Document trimis cu succes!');
+            setFile(null);
+            setPreviewUrl(null);
+            setMessage('');
+        } catch(e:any) { onError(e); } finally { setUploading(false); }
+    };
+
+    return (
+        <div className="p-4 pb-24 flex flex-col items-center">
+            <h2 className="text-2xl font-bold text-ro-blue mb-4">{t('send_docs_title')}</h2>
+            <div className="w-full max-w-md bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+                <div className="flex gap-2 justify-center">
+                     <button onClick={() => document.getElementById('doc-upload')?.click()} className="flex-1 py-3 bg-blue-50 text-ro-blue rounded-lg font-bold border border-blue-100 flex flex-col items-center gap-1 hover:bg-blue-100"><Upload className="w-6 h-6"/> Încarcă Fișier</button>
+                     <button onClick={startCamera} className="flex-1 py-3 bg-blue-50 text-ro-blue rounded-lg font-bold border border-blue-100 flex flex-col items-center gap-1 hover:bg-blue-100"><Camera className="w-6 h-6"/> Fă Poză</button>
+                     <input id="doc-upload" type="file" className="hidden" accept="image/*,application/pdf" onChange={handleFileChange} />
+                </div>
+                {showCamera && (
+                    <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
+                        <video ref={videoRef} autoPlay className="w-full h-full object-cover" />
+                        <button onClick={takePhoto} className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-full p-4 shadow-lg border-4 border-gray-300"><div className="w-4 h-4 bg-red-600 rounded-full"></div></button>
+                    </div>
+                )}
+                {file && (
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <div className="flex items-center gap-2 mb-2">
+                            {file.type.startsWith('image/') ? <Eye className="w-4 h-4 text-gray-500"/> : <FileText className="w-4 h-4 text-gray-500"/>}
+                            <span className="text-sm font-medium truncate flex-1">{file.name}</span>
+                            <button onClick={() => { setFile(null); setPreviewUrl(null); }}><X className="w-4 h-4 text-red-500"/></button>
+                        </div>
+                        {previewUrl && <img src={previewUrl} className="w-full h-40 object-contain bg-white rounded border" alt="Preview"/>}
+                        {!previewUrl && file.type === 'application/pdf' && <div className="text-xs text-center p-4 text-gray-400">Previzualizare PDF indisponibilă</div>}
+                    </div>
+                )}
+                <textarea className="w-full p-3 border rounded-lg h-24 text-sm" placeholder="Adaugă un mesaj (opțional)..." value={message} onChange={e => setMessage(e.target.value)} />
+                <Button fullWidth onClick={handleSend} disabled={!file || uploading}>{uploading ? 'Se trimite...' : 'Trimite Documentul'}</Button>
+            </div>
+        </div>
+    );
 };
 
 // --- MAIN APP COMPONENT ---
@@ -697,6 +779,9 @@ const App = () => {
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full transform translate-x-10 -translate-y-10"></div>
                     <h2 className="text-2xl font-bold mb-2">{t('welcome')} {user?.firstName ? `, ${user.firstName}` : ''}</h2>
                     <p className="opacity-90">{APP_DESCRIPTION_SHORT}</p>
+                    <div className="mt-4 flex justify-center bg-white/20 p-2 rounded-lg backdrop-blur-sm h-24">
+                       <img src="https://upload.wikimedia.org/wikipedia/commons/7/70/Coat_of_arms_of_Romania.svg" className="h-full w-auto object-contain" alt="MAE" />
+                    </div>
                 </div>
 
                 <section>
@@ -709,14 +794,16 @@ const App = () => {
                          <div className="text-gray-400 text-sm italic w-full text-center py-4">Nu există anunțuri momentan.</div>
                       ) : (
                         announcements.map(item => (
-                           <div key={item.id} onClick={() => setSelectedItem(item)} className="snap-center min-w-[280px] bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-all border border-gray-100">
-                              <div className="h-32 bg-gray-200 relative">
-                                 <img src={item.imageUrl || 'https://via.placeholder.com/300x200'} className="w-full h-full object-cover" alt={item.title}/>
-                                 <div className="absolute top-2 right-2 bg-ro-red text-white text-xs px-2 py-1 rounded-full font-bold shadow">{item.date}</div>
+                           <div key={item.id} onClick={() => setSelectedItem(item)} className="snap-center min-w-[300px] bg-white rounded-xl shadow-md p-3 flex gap-3 border border-gray-100 cursor-pointer hover:shadow-lg transition-all">
+                              <div className="w-24 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                                 <img src={item.imageUrl || 'https://via.placeholder.com/150'} className="w-full h-full object-cover" alt={item.title}/>
                               </div>
-                              <div className="p-3">
-                                 <h4 className="font-bold text-gray-800 truncate">{item.title}</h4>
-                                 <p className="text-sm text-gray-500 line-clamp-2 mt-1">{item.description}</p>
+                              <div className="flex-1 flex flex-col justify-center">
+                                 <h4 className="font-bold text-gray-800 line-clamp-2 text-sm">{item.title}</h4>
+                                 <div className="text-xs text-ro-red font-bold mt-1 flex items-center gap-1">
+                                    <Calendar className="w-3 h-3"/> {item.date}
+                                 </div>
+                                 <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.description}</p>
                               </div>
                            </div>
                         ))
@@ -778,23 +865,7 @@ const App = () => {
              </div>
           );
        case 'SEND_DOCS':
-          return (
-            <div className="p-4 pb-24 flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
-                <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center mb-4">
-                   <Send className="w-12 h-12 text-ro-blue" />
-                </div>
-                <div>
-                   <h2 className="text-2xl font-bold text-gray-800">{t('send_docs_title')}</h2>
-                   <p className="text-gray-500 mt-2 max-w-xs mx-auto">{t('send_docs_desc')}</p>
-                </div>
-                
-                <label className="w-full max-w-sm border-2 border-dashed border-gray-300 rounded-xl p-8 cursor-pointer hover:bg-gray-50 transition-colors group">
-                    <input type="file" className="hidden" />
-                    <Upload className="w-10 h-10 text-gray-400 mx-auto mb-2 group-hover:text-ro-blue transition-colors" />
-                    <span className="text-gray-500 font-medium group-hover:text-gray-700">{t('upload_text')}</span>
-                </label>
-            </div>
-          );
+          return user ? <SendDocsScreen user={user} t={t} onError={handleError} /> : <div className="p-10 text-center">Te rugăm să te autentifici. <Button onClick={() => setView('AUTH')} className="mt-4">Login</Button></div>;
        case 'EVENTS_LIST':
           return (
              <div className="p-4 pb-24 space-y-4">
@@ -803,19 +874,15 @@ const App = () => {
                     <div className="text-gray-400 text-sm italic w-full text-center py-4">Nu există evenimente active.</div>
                  ) : (
                     events.map(event => (
-                       <div key={event.id} onClick={() => setSelectedItem(event)} className="bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-all border border-gray-100">
-                          <div className="h-40 relative">
-                             <img src={event.imageUrl || 'https://via.placeholder.com/300x200'} className="w-full h-full object-cover" alt={event.title}/>
-                             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                                <h3 className="text-white font-bold text-lg">{event.title}</h3>
-                                <p className="text-white/80 text-sm flex items-center gap-1"><MapPinIcon className="w-3 h-3"/> {event.location}</p>
-                             </div>
-                             <div className="absolute top-2 right-2 bg-white text-gray-900 text-xs font-bold px-2 py-1 rounded shadow">
-                                {event.date}
-                             </div>
+                       <div key={event.id} onClick={() => setSelectedItem(event)} className="bg-white rounded-xl shadow-sm p-3 flex gap-3 border border-gray-100 cursor-pointer hover:shadow-md transition-all">
+                          <div className="w-24 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                             <img src={event.imageUrl || 'https://via.placeholder.com/150'} className="w-full h-full object-cover" alt={event.title}/>
                           </div>
-                          <div className="p-4">
-                             <p className="text-gray-600 line-clamp-2 text-sm">{event.description}</p>
+                          <div className="flex-1 flex flex-col justify-center">
+                             <h4 className="font-bold text-gray-800 line-clamp-2 text-sm">{event.title}</h4>
+                             <div className="text-xs text-ro-blue font-semibold mt-1 flex items-center gap-1"><MapPinIcon className="w-3 h-3"/> {event.location}</div>
+                             <div className="text-xs text-gray-500 mt-1 flex items-center gap-1"><ClockIcon className="w-3 h-3"/> {event.date}</div>
+                             <p className="text-xs text-gray-600 line-clamp-2 mt-1">{event.description}</p>
                           </div>
                        </div>
                     ))
@@ -846,7 +913,7 @@ const App = () => {
        case 'SETTINGS':
           return <SettingsScreen textSize={textSize} setTextSize={setTextSize} theme={theme} setTheme={setTheme} setView={setView} notifications={notifications} setNotifications={setNotifications} t={t} onShowSql={() => setShowSqlModal(true)} />;
        case 'PROFILE':
-          return user ? <ProfileScreen user={user} setUser={setUser} onLogout={handleLogout} t={t} onError={handleError} /> : <div className="p-10 text-center">Te rugăm să te autentifici. <Button onClick={() => setView('AUTH')} className="mt-4">Login</Button></div>;
+          return user ? <ProfileScreen user={user} setUser={setUser} onLogout={handleLogout} t={t} onError={handleError} onViewChange={setView} /> : <div className="p-10 text-center">Te rugăm să te autentifici. <Button onClick={() => setView('AUTH')} className="mt-4">Login</Button></div>;
        default:
           return null;
     }
@@ -860,7 +927,6 @@ const App = () => {
           onProfileClick={() => setView(user ? 'PROFILE' : 'AUTH')} 
           onSettingsClick={() => setView('SETTINGS')} 
           onSearchClick={() => setIsSearchOpen(true)}
-          onAdminClick={() => setView('ADMIN')}
           isLoggedIn={!!user}
           userRole={user?.role}
         />
