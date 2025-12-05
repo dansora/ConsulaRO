@@ -564,25 +564,50 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (authUser) {
              const updates = {
-                first_name: tempUser.firstName,
-                last_name: tempUser.lastName,
-                phone: tempUser.phone,
-                address: tempUser.address,
-                city: tempUser.city,
-                county: tempUser.county,
-                country: tempUser.country,
-                post_code: tempUser.postCode,
+                first_name: tempUser.firstName || null,
+                last_name: tempUser.lastName || null,
+                phone: tempUser.phone || null,
+                address: tempUser.address || null,
+                city: tempUser.city || null,
+                county: tempUser.county || null,
+                country: tempUser.country || null,
+                post_code: tempUser.postCode || null,
+                username: tempUser.username || null,
                 updated_at: new Date(),
              };
-             const { error } = await supabase.from('profiles').upsert({ id: authUser.id, ...updates });
-             if (error) throw error;
+             // Using onConflict to merge updates efficiently
+             const { error } = await supabase.from('profiles').upsert({ id: authUser.id, ...updates }, { onConflict: 'id' });
+             
+             if (error) {
+                // Parse Supabase error for user-friendly display
+                const msg = error.message || JSON.stringify(error);
+                if (error.code === 'PGRST204') {
+                   throw new Error("Eroare de structură bază de date: Coloana lipsește. Vă rugăm rulați scriptul SQL de actualizare.");
+                }
+                throw new Error(msg);
+             }
         }
         setUser(tempUser);
         setIsEditing(false);
         alert(t('profile_success'));
-      } catch (e) {
-        console.error(e);
-        alert(t('profile_error'));
+      } catch (e: any) {
+        console.error("Save Error:", e);
+        alert(`${t('profile_error')} ${e.message || e}`);
+      }
+   };
+
+   const handleDeleteAccount = async () => {
+      if (window.confirm('Sigur doriți să ștergeți contul? Această acțiune va șterge profilul dumneavoastră.')) {
+         try {
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            if (authUser) {
+               const { error } = await supabase.from('profiles').delete().eq('id', authUser.id);
+               if(error) throw error;
+               onLogout(); // Will trigger sign out
+            }
+         } catch (e: any) {
+            alert('Eroare la ștergere: ' + e.message);
+         }
       }
    };
 
@@ -618,14 +643,38 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
                     <label className="text-xs text-gray-500 block mb-1">{t('lbl_lastname')}</label>
                     <input disabled={!isEditing} value={isEditing ? tempUser.lastName : user.lastName} onChange={e => setTempUser({...tempUser, lastName: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white border-blue-300' : 'bg-gray-50 border-gray-200'}`} />
                  </div>
+                 
+                 {/* Added Missing Fields */}
+                 <div>
+                    <label className="text-xs text-gray-500 block mb-1">{t('lbl_username')}</label>
+                    <input disabled={!isEditing} value={isEditing ? tempUser.username : user.username} onChange={e => setTempUser({...tempUser, username: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white border-blue-300' : 'bg-gray-50 border-gray-200'}`} />
+                 </div>
+
                  <div>
                     <label className="text-xs text-gray-500 block mb-1">{t('lbl_phone')}</label>
                     <input disabled={!isEditing} value={isEditing ? tempUser.phone : user.phone} onChange={e => setTempUser({...tempUser, phone: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white border-blue-300' : 'bg-gray-50 border-gray-200'}`} />
                  </div>
+                 
+                 <div>
+                    <label className="text-xs text-gray-500 block mb-1">{t('lbl_address')}</label>
+                    <input disabled={!isEditing} value={isEditing ? tempUser.address : user.address} onChange={e => setTempUser({...tempUser, address: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white border-blue-300' : 'bg-gray-50 border-gray-200'}`} />
+                 </div>
+
                  <div>
                     <label className="text-xs text-gray-500 block mb-1">{t('lbl_city')}</label>
                     <input disabled={!isEditing} value={isEditing ? tempUser.city : user.city} onChange={e => setTempUser({...tempUser, city: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white border-blue-300' : 'bg-gray-50 border-gray-200'}`} />
                  </div>
+
+                 <div>
+                    <label className="text-xs text-gray-500 block mb-1">{t('lbl_county')}</label>
+                    <input disabled={!isEditing} value={isEditing ? tempUser.county : user.county} onChange={e => setTempUser({...tempUser, county: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white border-blue-300' : 'bg-gray-50 border-gray-200'}`} />
+                 </div>
+
+                 <div>
+                    <label className="text-xs text-gray-500 block mb-1">{t('lbl_postal')}</label>
+                    <input disabled={!isEditing} value={isEditing ? tempUser.postCode : user.postCode} onChange={e => setTempUser({...tempUser, postCode: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white border-blue-300' : 'bg-gray-50 border-gray-200'}`} />
+                 </div>
+
                  <div>
                     <label className="text-xs text-gray-500 block mb-1">{t('lbl_country')}</label>
                     <input disabled={!isEditing} value={isEditing ? tempUser.country : user.country} onChange={e => setTempUser({...tempUser, country: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white border-blue-300' : 'bg-gray-50 border-gray-200'}`} />
@@ -635,8 +684,12 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
         </div>
 
         <div className="mt-6 space-y-3">
-           <Button variant="ghost" fullWidth onClick={onLogout} className="text-red-600 hover:bg-red-50 hover:text-red-700 border border-red-100 flex items-center justify-center gap-2">
+           <Button variant="ghost" fullWidth onClick={onLogout} className="text-blue-600 hover:bg-blue-50 border border-blue-100 flex items-center justify-center gap-2">
               <LogOut className="w-4 h-4" /> {t('profile_logout')}
+           </Button>
+           
+           <Button variant="danger" fullWidth onClick={handleDeleteAccount} className="flex items-center justify-center gap-2 bg-red-50 text-red-600 border border-red-100 hover:bg-red-100">
+               <Trash2 className="w-4 h-4" /> {t('profile_delete')}
            </Button>
         </div>
      </div>
@@ -693,6 +746,7 @@ const App = () => {
       } else {
         setIsLoggedIn(false);
         setUser({ firstName: '', lastName: '', email: '', phone: '', address: '', city: '', country: '', county: '', username: '', avatarUrl: null, postCode: '', role: 'user' });
+        // Redirect to Auth if not Splash
         if (view !== 'SPLASH') setView('AUTH');
       }
     });
@@ -736,7 +790,17 @@ const App = () => {
       case 'EVENTS_LIST': return <EventsScreen t={t} events={cmsEvents} />;
       case 'FAQ': return <FaqScreen t={t} />;
       case 'SETTINGS': return <SettingsScreen textSize={textSize} setTextSize={setTextSize} theme={theme} setTheme={setTheme} setView={setView} notifications={notifications} setNotifications={setNotifications} t={t} />;
-      case 'PROFILE': return <ProfileScreen user={user} setUser={setUser} onLogout={() => { setIsLoggedIn(false); setView('AUTH'); }} t={t} />;
+      case 'PROFILE': return (
+        <ProfileScreen 
+          user={user} 
+          setUser={setUser} 
+          onLogout={async () => { 
+             // Call sign out; listener handles redirect
+             await supabase.auth.signOut(); 
+          }} 
+          t={t} 
+        />
+      );
       case 'ADMIN': return <AdminScreen user={user} onClose={() => setView('HOME')} />;
       default: return <div className="p-4">Loading...</div>;
     }
