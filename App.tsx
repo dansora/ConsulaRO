@@ -729,17 +729,17 @@ const App = () => {
                       <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Calendar className="w-5 h-5 text-ro-yellow" /> {t('title_events')}</h3>
                       <button onClick={() => setView('EVENTS_LIST')} className="text-sm text-ro-blue font-semibold">{t('view_all')}</button>
                    </div>
-                   <div className="space-y-3">
+                   <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x">
                       {events.length === 0 ? (
                          <div className="text-gray-400 text-sm italic w-full text-center py-4">Nu există evenimente active.</div>
                       ) : (
-                        events.slice(0, 3).map(event => (
-                           <div key={event.id} onClick={() => setSelectedItem(event)} className="bg-white rounded-xl shadow-sm p-3 flex gap-3 border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors">
-                              <div className="w-20 h-20 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                        events.map(event => (
+                           <div key={event.id} onClick={() => setSelectedItem(event)} className="snap-center min-w-[300px] bg-white rounded-xl shadow-md p-3 flex gap-3 border border-gray-100 cursor-pointer hover:shadow-lg transition-all">
+                              <div className="w-24 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
                                  <img src={event.imageUrl || 'https://via.placeholder.com/150'} className="w-full h-full object-cover" alt={event.title}/>
                               </div>
-                              <div className="flex-1">
-                                 <h4 className="font-bold text-gray-800 line-clamp-1">{event.title}</h4>
+                              <div className="flex-1 flex flex-col justify-center">
+                                 <h4 className="font-bold text-gray-800 line-clamp-2 text-sm">{event.title}</h4>
                                  <div className="text-xs text-ro-blue font-semibold mt-1 flex items-center gap-1"><MapPinIcon className="w-3 h-3"/> {event.location}</div>
                                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-1"><ClockIcon className="w-3 h-3"/> {event.date}</div>
                               </div>

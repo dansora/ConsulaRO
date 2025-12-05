@@ -1,5 +1,6 @@
+
 export const SQL_SCHEMA = `-- SCRIPT COMPLET DE REPARARE SI INITIALIZARE
--- Ruleaza acest script in Supabase SQL Editor pentru a repara erorile 400, 42703, 23502
+-- Ruleaza acest script in Supabase SQL Editor pentru a repara erorile 400, 42703, 23502, 42710
 
 -- 1. REPARARE EROARE 23502 (null value in column "content")
 -- Facem coloana veche 'content' optionala si ne asiguram ca avem 'description'
@@ -143,14 +144,21 @@ CREATE POLICY "Admins all docs" ON user_documents FOR SELECT USING (EXISTS (SELE
 DROP POLICY IF EXISTS "Users insert docs" ON user_documents;
 CREATE POLICY "Users insert docs" ON user_documents FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Storage Policies
+-- Storage Policies (Drop first to avoid 42710 error)
+DROP POLICY IF EXISTS "Public Profiles" ON storage.objects;
 CREATE POLICY "Public Profiles" ON storage.objects FOR SELECT USING (bucket_id = 'profile_images');
+DROP POLICY IF EXISTS "Auth Upload Profiles" ON storage.objects;
 CREATE POLICY "Auth Upload Profiles" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'profile_images' AND auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Auth Update Profiles" ON storage.objects;
 CREATE POLICY "Auth Update Profiles" ON storage.objects FOR UPDATE USING (bucket_id = 'profile_images' AND auth.uid() = owner);
 
+DROP POLICY IF EXISTS "Public Content" ON storage.objects;
 CREATE POLICY "Public Content" ON storage.objects FOR SELECT USING (bucket_id = 'content_images');
+DROP POLICY IF EXISTS "Auth Upload Content" ON storage.objects;
 CREATE POLICY "Auth Upload Content" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'content_images' AND auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Auth Upload Docs" ON storage.objects;
 CREATE POLICY "Auth Upload Docs" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'documents' AND auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Auth Select Docs" ON storage.objects;
 CREATE POLICY "Auth Select Docs" ON storage.objects FOR SELECT USING (bucket_id = 'documents' AND auth.uid() = owner);
 `;
