@@ -97,8 +97,10 @@ CREATE TABLE IF NOT EXISTS user_documents (
   file_name TEXT,
   file_url TEXT,
   file_type TEXT,
+  message TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+ALTER TABLE user_documents ADD COLUMN IF NOT EXISTS message TEXT;
 
 -- 8. Storage Buckets
 INSERT INTO storage.buckets (id, name, public) VALUES ('profile_images', 'profile_images', true) ON CONFLICT (id) DO NOTHING;

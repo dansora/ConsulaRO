@@ -54,6 +54,7 @@ export interface UserDocument {
   file_name: string;
   file_url: string;
   file_type: 'image' | 'pdf';
+  message?: string;
   created_at: string;
 }
 

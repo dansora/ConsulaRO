@@ -224,6 +224,14 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Doc Upload Modal State
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docPreview, setDocPreview] = useState<string | null>(null);
+  const [docMessage, setDocMessage] = useState('');
+  const [showDocCamera, setShowDocCamera] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   useEffect(() => { fetchData(); }, [tab]);
 
   const fetchData = async () => {
@@ -331,6 +339,46 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
     }
   };
 
+  // Doc Upload Functions
+  const startDocCamera = async () => { setShowDocCamera(true); try { const stream = await navigator.mediaDevices.getUserMedia({ video: true }); if (videoRef.current) videoRef.current.srcObject = stream; } catch(e) { alert('Err Camera'); setShowDocCamera(false); } };
+  const takeDocPhoto = () => { if (videoRef.current) { const canvas = document.createElement('canvas'); canvas.width = videoRef.current.videoWidth; canvas.height = videoRef.current.videoHeight; canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0); canvas.toBlob(blob => { if(blob) { const f = new File([blob], "photo.jpg", { type: "image/jpeg" }); setDocFile(f); setDocPreview(URL.createObjectURL(blob)); } }); const stream = videoRef.current.srcObject as MediaStream; stream?.getTracks().forEach(t => t.stop()); setShowDocCamera(false); } };
+  const handleDocFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const f = e.target.files[0];
+            setDocFile(f);
+            if (f.type.startsWith('image/')) setDocPreview(URL.createObjectURL(f));
+            else setDocPreview(null);
+        }
+    };
+  const handleAdminDocUpload = async () => {
+        if (!docFile || !user) return;
+        setUploadingImage(true);
+        try {
+            const fileExt = docFile.name.split('.').pop();
+            const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+            const { error: uploadErr } = await supabase.storage.from('documents').upload(fileName, docFile);
+            if (uploadErr) throw uploadErr;
+            const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(fileName);
+            
+            const { error: dbErr } = await supabase.from('user_documents').insert({
+                user_id: user.id,
+                user_email: user.email,
+                user_name: `${user.firstName} ${user.lastName} (Admin)`,
+                file_name: docFile.name,
+                file_url: publicUrl,
+                file_type: docFile.type.startsWith('image/') ? 'image' : 'pdf',
+                message: docMessage
+            });
+            if (dbErr) throw dbErr;
+            alert('Document încărcat cu succes!');
+            setDocFile(null);
+            setDocPreview(null);
+            setDocMessage('');
+            setIsDocModalOpen(false);
+            fetchData();
+        } catch(e:any) { onError(e); } finally { setUploadingImage(false); }
+    };
+
   const renderPreview = () => {
      if(!editingItem) return null;
      const isEvent = tab === 'EVENTS';
@@ -340,7 +388,7 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
            <div className="bg-yellow-50 p-2 text-sm text-yellow-800 border border-yellow-200 rounded">Mod previzualizare.</div>
            <div className="border rounded-lg overflow-hidden shadow-sm bg-white">
                {img && (<div className="h-48 w-full bg-black flex items-center justify-center"><img src={img} className="h-full object-contain" alt="Preview"/></div>)}
-               <div className="p-4"><h2 className="text-xl font-bold text-ro-blue mb-2">{editingItem.title}</h2><div className="text-sm text-ro-red font-semibold mb-2">{isEvent && <>{editingItem.location} • </>}{editingItem.date} {(editingItem.end_date || editingItem.endDate) ? ` - ${editingItem.end_date || editingItem.endDate}` : ''}</div><p className="text-gray-700 whitespace-pre-line">{editingItem.description}</p></div>
+               <div className="p-4"><h2 className="text-xl font-bold text-ro-blue mb-2">{editingItem.title}</h2><div className="text-sm text-ro-red font-semibold mb-2">{isEvent && <>{editingItem.location}</>}</div><p className="text-gray-700 whitespace-pre-line">{editingItem.description}</p></div>
            </div>
            <div className="flex gap-2 pt-4 border-t"><Button variant="ghost" onClick={() => setIsPreviewMode(false)}><ArrowLeft className="w-4 h-4 mr-2"/> Editare</Button><Button fullWidth onClick={() => saveItem(tab === 'ANNOUNCEMENTS' ? 'announcements' : 'events', editingItem)} disabled={saving}>{saving ? '...' : 'Salvează'}</Button></div>
         </div>
@@ -365,6 +413,35 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
        </div>
   );
 
+  const renderDocModal = () => (
+      <div className="space-y-4">
+          <div className="flex gap-2 justify-center">
+                <button onClick={() => document.getElementById('admin-doc-upload')?.click()} className="flex-1 py-3 bg-blue-50 text-ro-blue rounded-lg font-bold border border-blue-100 flex flex-col items-center gap-1 hover:bg-blue-100"><Upload className="w-6 h-6"/> Încarcă Fișier</button>
+                <button onClick={startDocCamera} className="flex-1 py-3 bg-blue-50 text-ro-blue rounded-lg font-bold border border-blue-100 flex flex-col items-center gap-1 hover:bg-blue-100"><Camera className="w-6 h-6"/> Fă Poză</button>
+                <input id="admin-doc-upload" type="file" className="hidden" accept="image/*,application/pdf" onChange={handleDocFileChange} />
+          </div>
+          {showDocCamera && (
+            <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
+                <video ref={videoRef} autoPlay className="w-full h-full object-cover" />
+                <button onClick={takeDocPhoto} className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-full p-4 shadow-lg border-4 border-gray-300"><div className="w-4 h-4 bg-red-600 rounded-full"></div></button>
+            </div>
+          )}
+          {docFile && (
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-2 mb-2">
+                    {docFile.type.startsWith('image/') ? <Eye className="w-4 h-4 text-gray-500"/> : <FileText className="w-4 h-4 text-gray-500"/>}
+                    <span className="text-sm font-medium truncate flex-1">{docFile.name}</span>
+                    <button onClick={() => { setDocFile(null); setDocPreview(null); }}><X className="w-4 h-4 text-red-500"/></button>
+                </div>
+                {docPreview && <img src={docPreview} className="w-full h-40 object-contain bg-white rounded border" alt="Preview"/>}
+                {!docPreview && docFile.type === 'application/pdf' && <div className="text-xs text-center p-4 text-gray-400">Previzualizare PDF indisponibilă</div>}
+            </div>
+          )}
+          <textarea className="w-full p-3 border rounded-lg h-24 text-sm" placeholder="Adaugă un mesaj..." value={docMessage} onChange={e => setDocMessage(e.target.value)} />
+          <Button fullWidth onClick={handleAdminDocUpload} disabled={!docFile || uploadingImage}>{uploadingImage ? 'Se încarcă...' : 'Trimite'}</Button>
+      </div>
+  );
+
   return (
     <div className="flex flex-col h-full bg-gray-100">
       <div className="bg-gray-800 text-white p-4 flex justify-between items-center shadow-md">
@@ -380,8 +457,26 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
         {(tab === 'ANNOUNCEMENTS' || tab === 'EVENTS') && (
            <div><div className="flex justify-between mb-4"><Button onClick={() => { setEditingItem({active: true}); setIsPreviewMode(false); setIsEditModalOpen(true); }}><Plus className="w-4 h-4 mr-1 inline"/> Adaugă</Button></div><div className="space-y-3">{(tab === 'ANNOUNCEMENTS' ? announcements : events).map((item: any) => (<div key={item.id} className="bg-white p-3 rounded-lg shadow border flex justify-between items-center"><div className="flex items-center gap-3"><img src={item.image_url || item.imageUrl} className="w-12 h-12 object-cover rounded" alt=""/><div className="font-bold text-sm">{item.title}</div></div><div className="flex gap-2"><button onClick={() => { setEditingItem(item); setIsPreviewMode(false); setIsEditModalOpen(true); }} className="p-2 bg-blue-50 text-blue-600 rounded"><Edit className="w-4 h-4"/></button><button onClick={() => deleteItem(tab === 'ANNOUNCEMENTS' ? 'announcements' : 'events', item.id)} className="p-2 bg-red-50 text-red-600 rounded"><Trash2 className="w-4 h-4"/></button></div></div>))}</div></div>
         )}
+        {tab === 'DOCUMENTS' && (
+            <div>
+                <div className="flex justify-end mb-4"><Button onClick={() => setIsDocModalOpen(true)}><Upload className="w-4 h-4 mr-1 inline"/> Încarcă Document</Button></div>
+                <div className="space-y-3">
+                    {docs.map(doc => (
+                        <div key={doc.id} className="bg-white rounded-lg shadow p-3 border text-sm">
+                            <div className="flex justify-between font-bold mb-1"><span>{doc.user_name}</span><span className="text-gray-400 font-normal text-xs">{new Date(doc.created_at).toLocaleDateString()}</span></div>
+                            <div className="text-gray-600 mb-2">{doc.user_email}</div>
+                            {doc.message && <div className="bg-blue-50 p-2 rounded text-xs text-blue-800 mb-2">"{doc.message}"</div>}
+                            <div className="flex items-center gap-2">
+                                <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1"><FileText className="w-3 h-3"/> {doc.file_name}</a>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
       </div>
       <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title={isPreviewMode ? 'Previzualizare' : 'Editare'}>{isPreviewMode ? renderPreview() : renderEditForm()}</Modal>
+      <Modal isOpen={isDocModalOpen} onClose={() => setIsDocModalOpen(false)} title="Încarcă Document">{renderDocModal()}</Modal>
     </div>
   );
 };
@@ -800,9 +895,6 @@ const App = () => {
                               </div>
                               <div className="flex-1 flex flex-col justify-center">
                                  <h4 className="font-bold text-gray-800 line-clamp-2 text-sm">{item.title}</h4>
-                                 <div className="text-xs text-ro-red font-bold mt-1 flex items-center gap-1">
-                                    <Calendar className="w-3 h-3"/> {item.date}
-                                 </div>
                                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.description}</p>
                               </div>
                            </div>
@@ -828,7 +920,6 @@ const App = () => {
                               <div className="flex-1 flex flex-col justify-center">
                                  <h4 className="font-bold text-gray-800 line-clamp-2 text-sm">{event.title}</h4>
                                  <div className="text-xs text-ro-blue font-semibold mt-1 flex items-center gap-1"><MapPinIcon className="w-3 h-3"/> {event.location}</div>
-                                 <div className="text-xs text-gray-500 mt-1 flex items-center gap-1"><ClockIcon className="w-3 h-3"/> {event.date}</div>
                               </div>
                            </div>
                         ))
@@ -881,7 +972,6 @@ const App = () => {
                           <div className="flex-1 flex flex-col justify-center">
                              <h4 className="font-bold text-gray-800 line-clamp-2 text-sm">{event.title}</h4>
                              <div className="text-xs text-ro-blue font-semibold mt-1 flex items-center gap-1"><MapPinIcon className="w-3 h-3"/> {event.location}</div>
-                             <div className="text-xs text-gray-500 mt-1 flex items-center gap-1"><ClockIcon className="w-3 h-3"/> {event.date}</div>
                              <p className="text-xs text-gray-600 line-clamp-2 mt-1">{event.description}</p>
                           </div>
                        </div>
