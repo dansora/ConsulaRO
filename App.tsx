@@ -1,10 +1,9 @@
 
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Menu, X, Home, Book, Send, HelpCircle, Settings, User, 
   LogOut, Globe, Moon, Sun, Monitor, Camera, Bell, Calendar,
-  ChevronRight, ChevronLeft, Image as ImageIcon, FileText, Users, Flag, Globe as GlobeIcon, FileCheck, Mail, BookOpen, UserCheck, MoreHorizontal, Search, Shield, Download, Edit, Trash2, Plus, Filter, Save
+  ChevronRight, ChevronLeft, Image as ImageIcon, FileText, Users, Flag, Globe as GlobeIcon, FileCheck, Mail, BookOpen, UserCheck, MoreHorizontal, Search, Shield, Download, Edit, Trash2, Plus, Filter, Save, FileIcon, Eye, ArrowLeft, Upload
 } from 'lucide-react';
 import { 
   LanguageCode, UserProfile, AppTheme, TextSize, ViewState, 
@@ -204,19 +203,15 @@ const BottomNav = ({ currentView, setView, t }: { currentView: ViewState, setVie
   );
 };
 
-// ... (SearchOverlay, DetailModal, etc. remain the same, simplified for brevity but assume they exist as before)
 const SearchOverlay = ({ isOpen, onClose, onNavigate, t }: { isOpen: boolean; onClose: () => void; onNavigate: (view: ViewState) => void; t: (k:string)=>string }) => {
-    // Re-use previous logic
     const [query, setQuery] = useState('');
-    const [category, setCategory] = useState<SearchCategory>('ALL');
     const inputRef = useRef<HTMLInputElement>(null);
   
     useEffect(() => {
       if (isOpen && inputRef.current) setTimeout(() => inputRef.current?.focus(), 100);
-      if (!isOpen) { setQuery(''); setCategory('ALL'); }
+      if (!isOpen) { setQuery(''); }
     }, [isOpen]);
 
-    // Simple mock results for UI consistency (real implementation would filter lists)
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 z-50 bg-white flex flex-col animate-fade-in">
@@ -225,7 +220,7 @@ const SearchOverlay = ({ isOpen, onClose, onNavigate, t }: { isOpen: boolean; on
                 <input ref={inputRef} className="flex-1 bg-transparent outline-none text-lg" placeholder={t('search_placeholder')} value={query} onChange={(e) => setQuery(e.target.value)} />
                 <button onClick={onClose} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300"><X className="w-5 h-5 text-gray-700" /></button>
             </div>
-            <div className="p-4 text-center text-gray-500">Funcția de căutare completă (vezi cod anterior)</div>
+            <div className="p-4 text-center text-gray-500">Căutare indisponibilă momentan.</div>
         </div>
     )
 }
@@ -265,6 +260,8 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
   
   const [editingItem, setEditingItem] = useState<any>(null); // For Add/Edit Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -306,13 +303,164 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
   };
 
   const saveItem = async (table: string, data: any) => {
-     if (data.id) {
-        await supabase.from(table).update(data).eq('id', data.id);
-     } else {
-        await supabase.from(table).insert(data);
+     try {
+       // Ensure end_date is saved. Ensure unified description.
+       const payload = {
+          title: data.title,
+          description: data.description || data.short_description || '', // Unify
+          image_url: data.image_url,
+          date: data.date,
+          end_date: data.end_date || null,
+          active: data.active !== false
+       };
+
+       if(table === 'events') {
+          (payload as any).location = data.location;
+       }
+
+       if (data.id) {
+          await supabase.from(table).update(payload).eq('id', data.id);
+       } else {
+          await supabase.from(table).insert(payload);
+       }
+       setIsEditModalOpen(false);
+       setIsPreviewMode(false);
+       fetchData();
+     } catch(e:any) {
+        alert('Eroare salvare: ' + e.message);
      }
-     setIsEditModalOpen(false);
-     fetchData();
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    setUploadingImage(true);
+    try {
+      const file = e.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage.from('content_images').upload(filePath, file);
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('content_images').getPublicUrl(filePath);
+      
+      setEditingItem({ ...editingItem, image_url: publicUrl });
+    } catch (error: any) {
+      alert('Eroare upload: ' + error.message);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Preview Logic
+  const renderPreview = () => {
+     if(!editingItem) return null;
+     
+     const isEvent = tab === 'EVENTS';
+     
+     return (
+        <div className="space-y-4">
+           <div className="bg-yellow-50 p-2 text-sm text-yellow-800 border border-yellow-200 rounded">
+              Acesta este modul de previzualizare. Verificați dacă totul arată corect înainte de salvare.
+           </div>
+
+           {/* Card Preview */}
+           <div className="border rounded-lg overflow-hidden shadow-sm bg-white">
+               {editingItem.image_url && (
+                   <div className="h-48 w-full bg-black flex items-center justify-center">
+                       <img src={editingItem.image_url} className="h-full object-contain" alt="Preview"/>
+                   </div>
+               )}
+               <div className="p-4">
+                  <h2 className="text-xl font-bold text-ro-blue mb-2">{editingItem.title}</h2>
+                  <div className="text-sm text-ro-red font-semibold mb-2">
+                     {isEvent && <>{editingItem.location} • </>}
+                     {editingItem.date} {editingItem.end_date ? ` - ${editingItem.end_date}` : ''}
+                  </div>
+                  <p className="text-gray-700 whitespace-pre-line">{editingItem.description}</p>
+               </div>
+           </div>
+
+           <div className="flex gap-2 pt-4 border-t">
+              <Button variant="ghost" onClick={() => setIsPreviewMode(false)}><ArrowLeft className="w-4 h-4 mr-2"/> Înapoi la Editare</Button>
+              <Button fullWidth onClick={() => saveItem(tab === 'ANNOUNCEMENTS' ? 'announcements' : 'events', editingItem)}>Confirmă și Salvează</Button>
+           </div>
+        </div>
+     );
+  };
+
+  const renderEditForm = () => {
+    return (
+       <div className="space-y-3">
+            <input 
+              className="w-full p-2 border rounded" 
+              placeholder="Titlu" 
+              value={editingItem?.title || ''} 
+              onChange={e => setEditingItem({...editingItem, title: e.target.value})} 
+            />
+            
+            <textarea 
+              className="w-full p-2 border rounded h-40" 
+              placeholder="Descriere Detaliată (unică)" 
+              value={editingItem?.description || ''} 
+              onChange={e => setEditingItem({...editingItem, description: e.target.value})} 
+            />
+            
+            {tab === 'EVENTS' && (
+               <input 
+                 className="w-full p-2 border rounded" 
+                 placeholder="Locație" 
+                 value={editingItem?.location || ''} 
+                 onChange={e => setEditingItem({...editingItem, location: e.target.value})} 
+               />
+            )}
+            
+            <div className="grid grid-cols-2 gap-2">
+               <div>
+                  <label className="text-xs text-gray-500">Data Început</label>
+                  <input 
+                    type="date"
+                    className="w-full p-2 border rounded" 
+                    value={editingItem?.date || ''} 
+                    onChange={e => setEditingItem({...editingItem, date: e.target.value})} 
+                  />
+               </div>
+               <div>
+                  <label className="text-xs text-gray-500">Data Sfârșit (Opțional)</label>
+                  <input 
+                    type="date"
+                    className="w-full p-2 border rounded" 
+                    value={editingItem?.end_date || ''} 
+                    onChange={e => setEditingItem({...editingItem, end_date: e.target.value})} 
+                  />
+               </div>
+            </div>
+
+            {/* Image Upload */}
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition-colors">
+               <label className="cursor-pointer block">
+                  <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2"/>
+                  <span className="text-sm text-ro-blue font-bold">{uploadingImage ? 'Se încarcă...' : 'Încarcă Imagine (jpg, png)'}</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploadingImage} />
+               </label>
+               {editingItem?.image_url && (
+                  <div className="mt-2 text-xs text-green-600 truncate">{editingItem.image_url}</div>
+               )}
+            </div>
+            
+            <label className="flex items-center gap-2">
+               <input 
+                 type="checkbox" 
+                 checked={editingItem?.active !== false} 
+                 onChange={e => setEditingItem({...editingItem, active: e.target.checked})} 
+               />
+               <span className="text-sm">Activ</span>
+            </label>
+
+            <Button fullWidth onClick={() => setIsPreviewMode(true)} disabled={!editingItem?.title || uploadingImage}><Eye className="w-4 h-4 mr-2"/> Previzualizare</Button>
+       </div>
+    );
   };
 
   return (
@@ -378,7 +526,7 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
         {(tab === 'ANNOUNCEMENTS' || tab === 'EVENTS') && (
            <div>
               <div className="flex justify-between mb-4">
-                 <Button onClick={() => { setEditingItem({}); setIsEditModalOpen(true); }}><Plus className="w-4 h-4 mr-1 inline"/> Adaugă Nou</Button>
+                 <Button onClick={() => { setEditingItem({}); setIsPreviewMode(false); setIsEditModalOpen(true); }}><Plus className="w-4 h-4 mr-1 inline"/> Adaugă Nou</Button>
               </div>
               <div className="space-y-3">
                  {(tab === 'ANNOUNCEMENTS' ? announcements : events).map((item: any) => (
@@ -387,11 +535,11 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
                           <img src={item.image_url || item.imageUrl} className="w-12 h-12 object-cover rounded bg-gray-200" alt=""/>
                           <div>
                              <div className="font-bold text-sm">{item.title}</div>
-                             <div className="text-xs text-gray-500">{item.date} • {item.active ? 'Activ' : 'Inactiv'}</div>
+                             <div className="text-xs text-gray-500">{item.date} {item.end_date ? `- ${item.end_date}` : ''} • {item.active ? 'Activ' : 'Inactiv'}</div>
                           </div>
                        </div>
                        <div className="flex gap-2">
-                          <button onClick={() => { setEditingItem(item); setIsEditModalOpen(true); }} className="p-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><Edit className="w-4 h-4"/></button>
+                          <button onClick={() => { setEditingItem(item); setIsPreviewMode(false); setIsEditModalOpen(true); }} className="p-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><Edit className="w-4 h-4"/></button>
                           {(user.role === 'super_admin' || user.role === 'admin') && (
                              <button onClick={() => deleteItem(tab === 'ANNOUNCEMENTS' ? 'announcements' : 'events', item.id)} className="p-2 bg-red-50 text-red-600 rounded hover:bg-red-100"><Trash2 className="w-4 h-4"/></button>
                           )}
@@ -434,61 +582,13 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
         )}
       </div>
 
-      {/* Edit Modal for CMS */}
-      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title={editingItem?.id ? 'Editează' : 'Adaugă Nou'}>
-         <div className="space-y-3">
-            <input 
-              className="w-full p-2 border rounded" 
-              placeholder="Titlu" 
-              value={editingItem?.title || ''} 
-              onChange={e => setEditingItem({...editingItem, title: e.target.value})} 
-            />
-            <textarea 
-              className="w-full p-2 border rounded h-24" 
-              placeholder="Descriere" 
-              value={editingItem?.short_description || editingItem?.description || ''} 
-              onChange={e => setEditingItem({...editingItem, [tab === 'ANNOUNCEMENTS' ? 'short_description' : 'description']: e.target.value})} 
-            />
-            {tab === 'ANNOUNCEMENTS' && (
-               <textarea 
-                 className="w-full p-2 border rounded h-24" 
-                 placeholder="Descriere Completă" 
-                 value={editingItem?.full_description || ''} 
-                 onChange={e => setEditingItem({...editingItem, full_description: e.target.value})} 
-               />
-            )}
-            {tab === 'EVENTS' && (
-               <input 
-                 className="w-full p-2 border rounded" 
-                 placeholder="Locație" 
-                 value={editingItem?.location || ''} 
-                 onChange={e => setEditingItem({...editingItem, location: e.target.value})} 
-               />
-            )}
-            <input 
-              type="date"
-              className="w-full p-2 border rounded" 
-              value={editingItem?.date || ''} 
-              onChange={e => setEditingItem({...editingItem, date: e.target.value})} 
-            />
-            <input 
-              className="w-full p-2 border rounded" 
-              placeholder="URL Imagine" 
-              value={editingItem?.image_url || ''} 
-              onChange={e => setEditingItem({...editingItem, image_url: e.target.value})} 
-            />
-            
-            <label className="flex items-center gap-2">
-               <input 
-                 type="checkbox" 
-                 checked={editingItem?.active !== false} 
-                 onChange={e => setEditingItem({...editingItem, active: e.target.checked})} 
-               />
-               <span className="text-sm">Activ</span>
-            </label>
-
-            <Button fullWidth onClick={() => saveItem(tab === 'ANNOUNCEMENTS' ? 'announcements' : 'events', editingItem)}>Salvează</Button>
-         </div>
+      {/* Edit/Preview Modal for CMS */}
+      <Modal 
+         isOpen={isEditModalOpen} 
+         onClose={() => setIsEditModalOpen(false)} 
+         title={isPreviewMode ? 'Previzualizare' : (editingItem?.id ? 'Editează' : 'Adaugă Nou')}
+      >
+         {isPreviewMode ? renderPreview() : renderEditForm()}
       </Modal>
 
     </div>
@@ -558,6 +658,66 @@ const SettingsScreen = ({ textSize, setTextSize, theme, setTheme, setView, notif
 const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setUser: (u: UserProfile) => void, onLogout: () => void, t: (k: string) => string }) => {
    const [isEditing, setIsEditing] = useState(false);
    const [tempUser, setTempUser] = useState(user);
+   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+   const [showCamera, setShowCamera] = useState(false);
+   const videoRef = useRef<HTMLVideoElement>(null);
+
+   // Camera Logic
+   const startCamera = async () => {
+      setShowCamera(true);
+      try {
+         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+         if (videoRef.current) videoRef.current.srcObject = stream;
+      } catch(e) { alert('Nu am putut accesa camera.'); setShowCamera(false); }
+   };
+
+   const takePhoto = () => {
+      if (videoRef.current) {
+         const canvas = document.createElement('canvas');
+         canvas.width = videoRef.current.videoWidth;
+         canvas.height = videoRef.current.videoHeight;
+         canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
+         const dataUrl = canvas.toDataURL('image/jpeg');
+         uploadAvatarFromDataUrl(dataUrl);
+         
+         // Stop stream
+         const stream = videoRef.current.srcObject as MediaStream;
+         stream?.getTracks().forEach(t => t.stop());
+         setShowCamera(false);
+      }
+   };
+
+   const uploadAvatarFromDataUrl = async (dataUrl: string) => {
+      // Convert base64 to blob
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], "avatar.jpg", { type: "image/jpeg" });
+      handleAvatarUpload(file);
+   };
+
+   const handleAvatarUpload = async (file: File) => {
+       if(!user.id) return;
+       setUploadingAvatar(true);
+       try {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+          const filePath = `${fileName}`;
+          
+          const { error: uploadError } = await supabase.storage.from('profile_images').upload(filePath, file);
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage.from('profile_images').getPublicUrl(filePath);
+          
+          setTempUser({...tempUser, avatarUrl: publicUrl});
+          // Auto save avatar
+          await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
+          setUser({...user, avatarUrl: publicUrl});
+       } catch (e:any) {
+          alert('Eroare upload: ' + e.message);
+       } finally {
+          setUploadingAvatar(false);
+       }
+   };
    
    const handleSave = async () => {
       try {
@@ -579,7 +739,6 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
              const { error } = await supabase.from('profiles').upsert({ id: authUser.id, ...updates }, { onConflict: 'id' });
              
              if (error) {
-                // Parse Supabase error for user-friendly display
                 const msg = error.message || JSON.stringify(error);
                 if (error.code === 'PGRST204') {
                    throw new Error("Eroare de structură bază de date: Coloana lipsește. Vă rugăm rulați scriptul SQL de actualizare.");
@@ -614,9 +773,20 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
    return (
      <div className="p-4 pb-24">
         <div className="flex flex-col items-center mb-6">
-           <div className="w-24 h-24 bg-gray-200 rounded-full mb-3 flex items-center justify-center overflow-hidden border-4 border-white shadow-md">
-              {user.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" alt="Profile"/> : <User className="w-10 h-10 text-gray-400" />}
+           <div className="relative group">
+               <div className="w-24 h-24 bg-gray-200 rounded-full mb-3 flex items-center justify-center overflow-hidden border-4 border-white shadow-md">
+                  {user.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover" alt="Profile"/> : <User className="w-10 h-10 text-gray-400" />}
+                  {showCamera && <video ref={videoRef} autoPlay className="absolute inset-0 w-full h-full object-cover z-20" />}
+               </div>
+               {isEditing && (
+                  <div className="absolute bottom-2 right-0 flex gap-1">
+                     <button onClick={() => document.getElementById('avatar-upload')?.click()} className="p-2 bg-blue-600 rounded-full text-white shadow hover:bg-blue-700"><Upload className="w-3 h-3"/></button>
+                     <button onClick={showCamera ? takePhoto : startCamera} className="p-2 bg-ro-red rounded-full text-white shadow hover:bg-red-700">{showCamera ? <Camera className="w-3 h-3 animate-pulse"/> : <Camera className="w-3 h-3"/>}</button>
+                  </div>
+               )}
+               <input id="avatar-upload" type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files && handleAvatarUpload(e.target.files[0])} />
            </div>
+           
            <h2 className="text-xl font-bold text-gray-800">{user.firstName} {user.lastName}</h2>
            <p className="text-gray-500 text-sm">{user.email}</p>
         </div>
@@ -644,7 +814,6 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: { user: UserProfile, setU
                     <input disabled={!isEditing} value={isEditing ? tempUser.lastName : user.lastName} onChange={e => setTempUser({...tempUser, lastName: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white border-blue-300' : 'bg-gray-50 border-gray-200'}`} />
                  </div>
                  
-                 {/* Added Missing Fields */}
                  <div>
                     <label className="text-xs text-gray-500 block mb-1">{t('lbl_username')}</label>
                     <input disabled={!isEditing} value={isEditing ? tempUser.username : user.username} onChange={e => setTempUser({...tempUser, username: e.target.value})} className={`w-full p-2 rounded border ${isEditing ? 'bg-white border-blue-300' : 'bg-gray-50 border-gray-200'}`} />
@@ -724,12 +893,25 @@ const App = () => {
   useEffect(() => {
      const fetchContent = async () => {
         const { data: ann } = await supabase.from('announcements').select('*').eq('active', true).order('date', {ascending: false});
-        if(ann && ann.length > 0) setCmsAnnouncements(ann as any);
-        else setCmsAnnouncements(MOCK_ANNOUNCEMENTS);
+        if(ann && ann.length > 0) {
+           // Map DB columns to Frontend Interface
+           const mappedAnn = ann.map((a: any) => ({
+             ...a,
+             imageUrl: a.image_url,
+             endDate: a.end_date
+           }));
+           setCmsAnnouncements(mappedAnn);
+        } else setCmsAnnouncements(MOCK_ANNOUNCEMENTS);
 
         const { data: ev } = await supabase.from('events').select('*').eq('active', true).order('date', {ascending: false});
-        if(ev && ev.length > 0) setCmsEvents(ev as any);
-        else setCmsEvents(MOCK_EVENTS);
+        if(ev && ev.length > 0) {
+           const mappedEv = ev.map((e: any) => ({
+              ...e,
+              imageUrl: e.image_url,
+              endDate: e.end_date
+           }));
+           setCmsEvents(mappedEv);
+        } else setCmsEvents(MOCK_EVENTS);
      };
      fetchContent();
   }, []);
@@ -921,8 +1103,8 @@ const HomeScreen = ({ t, announcements, events }: { t: (k:string)=>string, annou
                     <div className="w-1/3 relative h-full"><img src={item.imageUrl || item.image_url} alt="" className="w-full h-full object-cover" /></div>
                     <div className="w-2/3 p-3 flex flex-col justify-center">
                        <h4 className="font-bold text-gray-800 line-clamp-2 text-sm mb-1">{item.title}</h4>
-                       <div className="text-xs text-ro-red font-semibold mb-1">{item.date}</div>
-                       <p className="text-xs text-gray-500 line-clamp-2 leading-tight">{item.shortDescription || item.short_description || item.location}</p>
+                       <div className="text-xs text-ro-red font-semibold mb-1">{item.date} {item.endDate ? `- ${item.endDate}` : ''}</div>
+                       <p className="text-xs text-gray-500 line-clamp-2 leading-tight">{item.description}</p>
                     </div>
                  </div>
               ))}
@@ -944,7 +1126,7 @@ const HomeScreen = ({ t, announcements, events }: { t: (k:string)=>string, annou
        
        {/* List Modals */}
        <Modal isOpen={announcementModalOpen} onClose={() => setAnnouncementModalOpen(false)} title={t('title_announcements')}>
-          <div className="space-y-4">{announcements.map((item: any) => (<div key={item.id} onClick={() => setSelectedAnnouncement(item)} className="bg-white border rounded-lg p-2 flex gap-3 shadow-sm cursor-pointer h-24 overflow-hidden"><img src={item.imageUrl || item.image_url} className="w-1/3 object-cover rounded-md"/><div className="w-2/3"><h4 className="font-bold text-sm line-clamp-1">{item.title}</h4><p className="text-xs text-gray-500 line-clamp-2">{item.shortDescription || item.short_description}</p></div></div>))}</div>
+          <div className="space-y-4">{announcements.map((item: any) => (<div key={item.id} onClick={() => setSelectedAnnouncement(item)} className="bg-white border rounded-lg p-2 flex gap-3 shadow-sm cursor-pointer h-24 overflow-hidden"><img src={item.imageUrl || item.image_url} className="w-1/3 object-cover rounded-md"/><div className="w-2/3"><h4 className="font-bold text-sm line-clamp-1">{item.title}</h4><p className="text-xs text-gray-500 line-clamp-2">{item.description}</p></div></div>))}</div>
        </Modal>
 
        <Modal isOpen={eventsModalOpen} onClose={() => setEventsModalOpen(false)} title={t('title_events')}>
@@ -952,11 +1134,11 @@ const HomeScreen = ({ t, announcements, events }: { t: (k:string)=>string, annou
        </Modal>
 
        <DetailModal isOpen={!!selectedAnnouncement} onClose={() => setSelectedAnnouncement(null)} title="Detalii" imageUrl={selectedAnnouncement?.imageUrl || selectedAnnouncement?.image_url}>
-          {selectedAnnouncement && <><h2 className="text-xl font-bold text-ro-blue mb-2">{selectedAnnouncement.title}</h2><div className="text-sm text-gray-500 mb-4">{selectedAnnouncement.date}</div><p className="text-gray-700 whitespace-pre-line">{selectedAnnouncement.fullDescription || selectedAnnouncement.full_description || selectedAnnouncement.short_description}</p></>}
+          {selectedAnnouncement && <><h2 className="text-xl font-bold text-ro-blue mb-2">{selectedAnnouncement.title}</h2><div className="text-sm text-gray-500 mb-4">{selectedAnnouncement.date} {selectedAnnouncement.endDate ? `- ${selectedAnnouncement.endDate}` : ''}</div><p className="text-gray-700 whitespace-pre-line">{selectedAnnouncement.description}</p></>}
        </DetailModal>
 
        <DetailModal isOpen={!!selectedEvent} onClose={() => setSelectedEvent(null)} title="Detalii" imageUrl={selectedEvent?.imageUrl || selectedEvent?.image_url}>
-          {selectedEvent && <><h2 className="text-xl font-bold text-ro-blue mb-1">{selectedEvent.title}</h2><div className="text-sm text-ro-red font-semibold mb-2">{selectedEvent.location} • {selectedEvent.date}</div><p className="text-gray-700 whitespace-pre-line">{selectedEvent.description}</p></>}
+          {selectedEvent && <><h2 className="text-xl font-bold text-ro-blue mb-1">{selectedEvent.title}</h2><div className="text-sm text-ro-red font-semibold mb-2">{selectedEvent.location} • {selectedEvent.date} {selectedEvent.endDate ? `- ${selectedEvent.endDate}` : ''}</div><p className="text-gray-700 whitespace-pre-line">{selectedEvent.description}</p></>}
        </DetailModal>
     </div>
   );
@@ -976,7 +1158,7 @@ const EventsScreen = ({ t, events }: { t: (k:string)=>string, events: any[] }) =
          ))}
        </div>
        <DetailModal isOpen={!!selectedEvent} onClose={() => setSelectedEvent(null)} title="Detalii Eveniment" imageUrl={selectedEvent?.imageUrl || selectedEvent?.image_url}>
-         {selectedEvent && <><h2 className="text-xl font-bold text-ro-blue mb-1">{selectedEvent.title}</h2><div className="text-sm text-ro-red font-semibold mb-2">{selectedEvent.location} • {selectedEvent.date}</div><p className="text-gray-700 whitespace-pre-line">{selectedEvent.description}</p></>}
+         {selectedEvent && <><h2 className="text-xl font-bold text-ro-blue mb-1">{selectedEvent.title}</h2><div className="text-sm text-ro-red font-semibold mb-2">{selectedEvent.location} • {selectedEvent.date} {selectedEvent.endDate ? `- ${selectedEvent.endDate}` : ''}</div><p className="text-gray-700 whitespace-pre-line">{selectedEvent.description}</p></>}
        </DetailModal>
      </div>
    );

@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { Announcement, EventItem, FaqCategory, LanguageCode, ServiceCategory } from './types';
 import { 
@@ -263,8 +262,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
   {
     id: '1',
     title: 'Alegeri Prezidențiale 2024',
-    shortDescription: 'Informații privind organizarea secțiilor de votare în străinătate.',
-    fullDescription: 'Ministerul Afacerilor Externe informează cetățenii români din străinătate cu privire la organizarea alegerilor prezidențiale din anul 2024. Vă rugăm să verificați lista secțiilor de votare disponibile în țara dumneavoastră de reședință. Este necesar un act de identitate valabil.',
+    description: 'Ministerul Afacerilor Externe informează cetățenii români din străinătate cu privire la organizarea alegerilor prezidențiale din anul 2024. Vă rugăm să verificați lista secțiilor de votare disponibile în țara dumneavoastră de reședință.',
     imageUrl: 'https://picsum.photos/600/400?random=1',
     date: '2024-10-15',
     active: true
@@ -272,8 +270,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
   {
     id: '2',
     title: 'Program Consulat Vacanță',
-    shortDescription: 'Modificări de program în perioada sărbătorilor de iarnă.',
-    fullDescription: 'În perioada 24 Decembrie - 3 Ianuarie, activitatea cu publicul va fi suspendată, cu excepția cazurilor de urgență majoră (decese, accidente). Vă mulțumim pentru înțelegere.',
+    description: 'În perioada 24 Decembrie - 3 Ianuarie, activitatea cu publicul va fi suspendată, cu excepția cazurilor de urgență majoră (decese, accidente). Vă mulțumim pentru înțelegere.',
     imageUrl: 'https://picsum.photos/600/400?random=2',
     date: '2024-12-01',
     active: true
@@ -281,8 +278,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
   {
     id: '3',
     title: 'Consulate Itinerante',
-    shortDescription: 'Lista consulatelor itinerante pentru luna viitoare.',
-    fullDescription: 'Echipele consulare mobile se vor deplasa în următoarele orașe: Lyon (Franța), Birmingham (UK), și Dortmund (Germania). Programările se fac exclusiv online.',
+    description: 'Echipele consulare mobile se vor deplasa în următoarele orașe: Lyon (Franța), Birmingham (UK), și Dortmund (Germania). Programările se fac exclusiv online.',
     imageUrl: 'https://picsum.photos/600/400?random=3',
     date: '2024-11-10',
     active: true
@@ -290,8 +286,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
    {
     id: '4',
     title: 'Modificări Taxe Consulare',
-    shortDescription: 'Actualizare cuantum taxe începând cu 1 ianuarie.',
-    fullDescription: 'Vă informăm că începând cu data de 1 ianuarie, anumite taxe consulare vor fi actualizate conform noilor reglementări legislative.',
+    description: 'Vă informăm că începând cu data de 1 ianuarie, anumite taxe consulare vor fi actualizate conform noilor reglementări legislative.',
     imageUrl: 'https://picsum.photos/600/400?random=10',
     date: '2024-12-15',
     active: true
@@ -299,8 +294,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
   {
     id: '5',
     title: 'Programare Online Obligatorie',
-    shortDescription: 'Toate serviciile necesită programare prealabilă.',
-    fullDescription: 'Pentru a evita aglomerația și a reduce timpii de așteptare, toate serviciile consulare se efectuează exclusiv pe bază de programare prin portalul econsulat.ro.',
+    description: 'Pentru a evita aglomerația și a reduce timpii de așteptare, toate serviciile consulare se efectuează exclusiv pe bază de programare prin portalul econsulat.ro.',
     imageUrl: 'https://picsum.photos/600/400?random=11',
     date: '2024-09-20',
     active: true

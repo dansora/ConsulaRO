@@ -16,16 +16,16 @@ export interface UserProfile {
   postCode?: string;
   username: string;
   avatarUrl: string | null;
-  role?: UserRole; // New field for role-based access
+  role?: UserRole; 
 }
 
 export interface Announcement {
   id: string;
   title: string;
-  shortDescription: string;
-  fullDescription: string;
+  description: string; // Unified description
   imageUrl: string;
-  date: string; // ISO Date string YYYY-MM-DD
+  date: string; // Start Date YYYY-MM-DD
+  endDate?: string; // End Date YYYY-MM-DD
   active: boolean;
 }
 
@@ -33,7 +33,8 @@ export interface EventItem {
   id: string;
   title: string;
   location: string;
-  date: string;
+  date: string; // Start Date
+  endDate?: string; // End Date
   description: string;
   imageUrl: string;
   active: boolean;
