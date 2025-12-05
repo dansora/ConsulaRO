@@ -22,10 +22,12 @@ export interface UserProfile {
 export interface Announcement {
   id: string;
   title: string;
-  description: string; // Unified description
-  imageUrl: string;
-  date: string; // Start Date YYYY-MM-DD
-  endDate?: string; // End Date YYYY-MM-DD
+  description: string;
+  imageUrl?: string; // Optional during creation
+  image_url?: string; // DB field matching
+  date: string;
+  endDate?: string | null; // Optional/Null
+  end_date?: string | null; // DB field matching
   active: boolean;
 }
 
@@ -33,10 +35,12 @@ export interface EventItem {
   id: string;
   title: string;
   location: string;
-  date: string; // Start Date
-  endDate?: string; // End Date
+  date: string;
+  endDate?: string | null;
+  end_date?: string | null;
   description: string;
-  imageUrl: string;
+  imageUrl?: string;
+  image_url?: string;
   active: boolean;
 }
 
