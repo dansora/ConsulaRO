@@ -98,7 +98,7 @@ const Header = ({
            {/* APP LOGO IMPLEMENTATION */}
            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md overflow-hidden border-2 border-white/50">
              <img 
-               src="/logo.png" 
+               src="/ConsulaRO.png" 
                alt="App Logo" 
                className="w-full h-full object-cover"
                onError={(e) => {
