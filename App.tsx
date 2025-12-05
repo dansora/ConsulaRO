@@ -787,7 +787,13 @@ const App = () => {
   const fetchProfile = async (userId: string) => {
       let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
       
-      if (!data && !error) {
+      // Fix for PGRST116 error preventing fallback creation
+      if (error && error.code === 'PGRST116') {
+          error = null;
+          data = null;
+      }
+      
+      if (!data) {
         // Fallback: If auth succeeded but profile missing (trigger failed/delayed), create it now.
         const { data: userData } = await supabase.auth.getUser();
         if(userData.user) {
@@ -799,7 +805,19 @@ const App = () => {
                  role: 'user'
              };
              const { error: insertError } = await supabase.from('profiles').insert(newProfile);
-             if(!insertError) data = newProfile;
+             
+             if (!insertError) {
+                 data = newProfile;
+                 // Ensure error is cleared if we successfully created the profile
+                 error = null; 
+             } else {
+                 // If insert failed (e.g. duplicate key), try fetching one last time
+                 const { data: retryData } = await supabase.from('profiles').select('*').eq('id', userId).single();
+                 if (retryData) {
+                     data = retryData;
+                     error = null;
+                 }
+             }
         }
       }
 
