@@ -4,7 +4,7 @@ import {
   Home, Book, Send, HelpCircle, Settings, User, 
   LogOut, Camera, Bell, Calendar,
   ChevronRight, Search, Shield, Trash2, Plus, Edit, Eye, ArrowLeft, Upload, X, Globe as GlobeIcon, FileText, Save, AlertTriangle, Database,
-  Sun, Moon, Monitor, Type
+  Sun, Moon, Monitor, Type, Info, Megaphone
 } from 'lucide-react';
 import { 
   LanguageCode, UserProfile, AppTheme, TextSize, ViewState, 
@@ -33,7 +33,6 @@ const useTranslation = (lang: LanguageCode) => {
 
 // --- Sub-Components ---
 
-// New: Modal to display SQL code
 const SqlFixModal = ({ isOpen, onClose, t }: { isOpen: boolean; onClose: () => void; t: any }) => {
   const [copied, setCopied] = useState(false);
   if (!isOpen) return null;
@@ -67,7 +66,6 @@ const SqlFixModal = ({ isOpen, onClose, t }: { isOpen: boolean; onClose: () => v
   );
 };
 
-// New: Modal to display Errors with option to show SQL
 const ErrorDisplayModal = ({ error, isOpen, onClose, onShowSql, t }: any) => {
   if (!isOpen || !error) return null;
   
@@ -153,13 +151,13 @@ const Header = ({ currentLang, setLang, onProfileClick, onSettingsClick, onSearc
 };
 
 const BottomNav = ({ currentView, setView, t }: any) => {
-  if (currentView === 'ADMIN') return null;
+  if (currentView === 'ADMIN' || currentView === 'SEND_DOCS') return null;
   const navItems = [
     { view: 'HOME', icon: Home, label: t('nav_home') },
     { view: 'SERVICES', icon: Book, label: t('nav_services') },
-    { view: 'SEND_DOCS', icon: Send, label: t('nav_send') },
+    { view: 'ANNOUNCEMENTS_LIST', icon: Megaphone, label: t('nav_announcements') },
     { view: 'EVENTS_LIST', icon: Calendar, label: t('nav_events') },
-    { view: 'FAQ', icon: HelpCircle, label: t('nav_faq') },
+    { view: 'INFO', icon: Info, label: t('nav_info') },
   ];
   return (
     <nav className="fixed bottom-0 w-full bg-blue-50 pb-safe shadow-[0_-2px_10px_rgba(0,0,0,0.1)] z-40 border-t border-blue-100">
@@ -277,6 +275,15 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
     }
   };
 
+  const updateUserRole = async (userId: string, newRole: string) => {
+    try {
+        const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+        if (error) throw error;
+        alert(`Rol actualizat la ${newRole}`);
+        fetchData();
+    } catch(e) { onError(e); }
+  };
+
   const deleteItem = async (table: string, id: string) => {
     if(!confirm('Sigur doriți să ștergeți?')) return;
     const { error } = await supabase.from(table).delete().eq('id', id);
@@ -287,12 +294,11 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
   const saveItem = async (table: string, data: any) => {
      setSaving(true);
      try {
-       // Convert Date fields. If empty string, send null to DB to avoid 400 Bad Request
        const cleanDate = (d: string) => (d && d.trim() !== '' ? d : null);
 
        const payload = {
           title: data.title,
-          description: data.description || '', // Ensure description is sent, default to empty string to avoid null issues if schema not updated
+          description: data.description || '',
           image_url: data.image_url || data.imageUrl,
           date: cleanDate(data.date),
           end_date: cleanDate(data.end_date || data.endDate),
@@ -449,13 +455,41 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
       <div className="bg-gray-800 text-white p-4 flex justify-between items-center shadow-md">
           <h2 className="text-xl font-bold flex items-center gap-2"><Shield /> Admin</h2>
           <div className="flex items-center gap-2">
-             <button onClick={onShowSql} className="text-xs bg-blue-600 px-3 py-1 rounded hover:bg-blue-500 flex items-center gap-1"><Database className="w-3 h-3"/> SQL</button>
+             {user.role === 'super_admin' && (
+                <button onClick={onShowSql} className="text-xs bg-blue-600 px-3 py-1 rounded hover:bg-blue-500 flex items-center gap-1"><Database className="w-3 h-3"/> Mentenanță</button>
+             )}
              <button onClick={onClose} className="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600">Ieșire</button>
           </div>
       </div>
       <div className="flex bg-white shadow-sm overflow-x-auto">{['USERS', 'ANNOUNCEMENTS', 'EVENTS', 'DOCUMENTS'].map(t => (<button key={t} onClick={() => setTab(t as any)} className={`px-4 py-3 font-bold text-sm whitespace-nowrap ${tab === t ? 'text-ro-blue border-b-2 border-ro-blue bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}>{t}</button>))}</div>
       <div className="flex-1 overflow-y-auto p-4">
-        {tab === 'USERS' && (<div className="grid grid-cols-1 md:grid-cols-2 gap-4">{users.map(u => (<div key={u.id} className="bg-white rounded-lg shadow p-3 flex gap-3 border"><div className="w-1/3"><img src={u.avatarUrl || 'https://via.placeholder.com/150'} className="w-full h-24 object-cover rounded" alt=""/></div><div className="w-2/3 text-sm"><div className="font-bold">{u.firstName} {u.lastName}</div><div>{u.email}</div><div className="text-xs bg-gray-100 p-1 rounded inline-block mt-1">{u.role}</div></div></div>))}</div>)}
+        {tab === 'USERS' && (<div className="grid grid-cols-1 md:grid-cols-2 gap-4">{users.map(u => (
+            <div key={u.id} className="bg-white rounded-lg shadow p-3 flex gap-3 border">
+                <div className="w-1/3"><img src={u.avatarUrl || 'https://via.placeholder.com/150'} className="w-full h-24 object-cover rounded" alt=""/></div>
+                <div className="w-2/3 text-sm flex flex-col justify-between">
+                    <div>
+                        <div className="font-bold">{u.firstName} {u.lastName}</div>
+                        <div className="text-xs text-gray-500">{u.email}</div>
+                    </div>
+                    {user.role === 'super_admin' ? (
+                        <div className="mt-2">
+                            <label className="text-xs font-bold text-gray-500">Rol:</label>
+                            <select 
+                                value={u.role || 'user'} 
+                                onChange={(e) => updateUserRole(u.id!, e.target.value)}
+                                className="block w-full mt-1 p-1 border rounded text-xs bg-gray-50"
+                            >
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                                <option value="super_admin">Super Admin</option>
+                            </select>
+                        </div>
+                    ) : (
+                        <div className="text-xs bg-gray-100 p-1 rounded inline-block mt-1 self-start">{u.role || 'user'}</div>
+                    )}
+                </div>
+            </div>
+        ))}</div>)}
         {(tab === 'ANNOUNCEMENTS' || tab === 'EVENTS') && (
            <div><div className="flex justify-between mb-4"><Button onClick={() => { setEditingItem({active: true}); setIsPreviewMode(false); setIsEditModalOpen(true); }}><Plus className="w-4 h-4 mr-1 inline"/> Adaugă</Button></div><div className="space-y-3">{(tab === 'ANNOUNCEMENTS' ? announcements : events).map((item: any) => (<div key={item.id} className="bg-white p-3 rounded-lg shadow border flex justify-between items-center"><div className="flex items-center gap-3"><img src={item.image_url || item.imageUrl} className="w-12 h-12 object-cover rounded" alt=""/><div className="font-bold text-sm">{item.title}</div></div><div className="flex gap-2"><button onClick={() => { setEditingItem(item); setIsPreviewMode(false); setIsEditModalOpen(true); }} className="p-2 bg-blue-50 text-blue-600 rounded"><Edit className="w-4 h-4"/></button><button onClick={() => deleteItem(tab === 'ANNOUNCEMENTS' ? 'announcements' : 'events', item.id)} className="p-2 bg-red-50 text-red-600 rounded"><Trash2 className="w-4 h-4"/></button></div></div>))}</div></div>
         )}
@@ -484,7 +518,7 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
 };
 
 // --- SETTINGS SCREEN ---
-const SettingsScreen = ({ textSize, setTextSize, theme, setTheme, setView, notifications, setNotifications, t, onShowSql }: any) => {
+const SettingsScreen = ({ textSize, setTextSize, theme, setTheme, setView, notifications, setNotifications, t }: any) => {
   return ( 
       <div className="p-4 space-y-6">
           <h2 className="text-2xl font-bold text-ro-blue mb-4">{t('settings_title')}</h2>
@@ -514,14 +548,7 @@ const SettingsScreen = ({ textSize, setTextSize, theme, setTheme, setView, notif
           </div>
 
           <div className="space-y-2">
-             <Button variant="ghost" fullWidth onClick={() => alert("Pagina Termeni în construcție.")} className="justify-start bg-white border border-gray-100">{t('settings_terms')}</Button>
-             <Button variant="ghost" fullWidth onClick={() => alert("Pagina Politici în construcție.")} className="justify-start bg-white border border-gray-100">{t('settings_privacy')}</Button>
              <Button variant="ghost" fullWidth onClick={() => alert("Email: contact@consularo.app")} className="justify-start bg-white border border-gray-100">{t('settings_contact')}</Button>
-          </div>
-
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Database className="w-4 h-4" /> Mentenanță</h3>
-              <Button variant="secondary" fullWidth onClick={onShowSql} className="flex items-center justify-center gap-2"><Database className="w-4 h-4"/> {t('settings_sql')}</Button>
           </div>
       </div> 
     );
@@ -602,6 +629,7 @@ const ProfileScreen = ({ user, setUser, onLogout, t, onError, onViewChange }: an
            {(user.role === 'admin' || user.role === 'super_admin') && (
               <Button onClick={() => onViewChange('ADMIN')} className="mt-2 text-xs flex items-center gap-2 bg-ro-blue"><Shield className="w-3 h-3"/> Panou Admin</Button>
            )}
+           <Button onClick={() => onViewChange('SEND_DOCS')} className="mt-2 text-xs flex items-center gap-2 bg-ro-yellow text-ro-blue font-bold"><Send className="w-3 h-3"/> {t('profile_send_docs')}</Button>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -631,7 +659,7 @@ const ProfileScreen = ({ user, setUser, onLogout, t, onError, onViewChange }: an
    );
 };
 
-const SendDocsScreen = ({ user, t, onError }: any) => {
+const SendDocsScreen = ({ user, t, onError, onBack }: any) => {
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [message, setMessage] = useState('');
@@ -675,12 +703,16 @@ const SendDocsScreen = ({ user, t, onError }: any) => {
             setFile(null);
             setPreviewUrl(null);
             setMessage('');
+            onBack();
         } catch(e:any) { onError(e); } finally { setUploading(false); }
     };
 
     return (
         <div className="p-4 pb-24 flex flex-col items-center">
-            <h2 className="text-2xl font-bold text-ro-blue mb-4">{t('send_docs_title')}</h2>
+            <div className="w-full flex items-center mb-4">
+                 <button onClick={onBack} className="p-2 mr-2 bg-gray-100 rounded-full hover:bg-gray-200"><ArrowLeft className="w-5 h-5 text-gray-700"/></button>
+                 <h2 className="text-2xl font-bold text-ro-blue">{t('send_docs_title')}</h2>
+            </div>
             <div className="w-full max-w-md bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
                 <div className="flex gap-2 justify-center">
                      <button onClick={() => document.getElementById('doc-upload')?.click()} className="flex-1 py-3 bg-blue-50 text-ro-blue rounded-lg font-bold border border-blue-100 flex flex-col items-center gap-1 hover:bg-blue-100"><Upload className="w-6 h-6"/> Încarcă Fișier</button>
@@ -711,6 +743,49 @@ const SendDocsScreen = ({ user, t, onError }: any) => {
     );
 };
 
+const InfoScreen = ({ t }: any) => {
+    return (
+        <div className="p-4 pb-24">
+            <h2 className="text-2xl font-bold text-ro-blue mb-6">{t('info_title')}</h2>
+            
+            <section className="mb-6">
+                <h3 className="text-lg font-bold text-gray-800 mb-3 border-b pb-2">{t('faq_section')}</h3>
+                <div className="space-y-4">
+                    {FAQ_DATA.map(cat => (
+                        <div key={cat.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                            <h4 className="font-bold text-md text-ro-blue mb-2">{cat.title}</h4>
+                            <div className="space-y-3">
+                                {cat.questions.map((q, idx) => (
+                                    <div key={idx} className="bg-gray-50 p-3 rounded-lg">
+                                        <p className="font-semibold text-gray-800 text-sm mb-1">Q: {q.question}</p>
+                                        <p className="text-gray-600 text-sm">A: {q.answer}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            <section className="mb-6">
+                <h3 className="text-lg font-bold text-gray-800 mb-3 border-b pb-2">{t('terms_section')}</h3>
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-sm text-gray-600">
+                    <p>Termenii și condițiile aplicației ConsulaRO...</p>
+                    <p className="text-xs text-gray-400 mt-2 italic">(Secțiune în dezvoltare. Aici va fi textul legal complet.)</p>
+                </div>
+            </section>
+
+            <section className="mb-6">
+                <h3 className="text-lg font-bold text-gray-800 mb-3 border-b pb-2">{t('privacy_section')}</h3>
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-sm text-gray-600">
+                    <p>Politica de confidențialitate privind datele personale...</p>
+                    <p className="text-xs text-gray-400 mt-2 italic">(Secțiune în dezvoltare. Aici va fi textul legal complet.)</p>
+                </div>
+            </section>
+        </div>
+    );
+};
+
 // --- MAIN APP COMPONENT ---
 
 const App = () => {
@@ -727,7 +802,7 @@ const App = () => {
   const [showSqlModal, setShowSqlModal] = useState(false);
   const [errorModal, setErrorModal] = useState<{isOpen: boolean, error: any}>({isOpen: false, error: null});
 
-  // Data State - Initialize empty, fetch from DB
+  // Data State
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<Announcement | EventItem | null>(null);
@@ -766,20 +841,12 @@ const App = () => {
   useEffect(() => {
      const fetchContent = async () => {
         const { data: ann, error: annErr } = await supabase.from('announcements').select('*').eq('active', true).order('date', {ascending: false});
-        if(annErr) {
-            console.error("Announcements Fetch Error:", JSON.stringify(annErr, null, 2));
-            // Do not use mock data fallback
-        } else {
-            if(ann) setAnnouncements(ann.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date, active: i.active})));
-        }
+        if(annErr) console.error("Announcements Fetch Error:", JSON.stringify(annErr, null, 2));
+        else if(ann) setAnnouncements(ann.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date, active: i.active})));
         
         const { data: ev, error: evErr } = await supabase.from('events').select('*').eq('active', true).order('date', {ascending: false});
-        if(evErr) {
-            console.error("Events Fetch Error:", JSON.stringify(evErr, null, 2));
-            // Do not use mock data fallback
-        } else {
-            if(ev) setEvents(ev.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date, active: i.active})));
-        }
+        if(evErr) console.error("Events Fetch Error:", JSON.stringify(evErr, null, 2));
+        else if(ev) setEvents(ev.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date, active: i.active})));
      };
      fetchContent();
   }, []);
@@ -787,11 +854,7 @@ const App = () => {
   const fetchProfile = async (userId: string) => {
       let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
       
-      // Fix for PGRST116 error preventing fallback creation
-      if (error && error.code === 'PGRST116') {
-          error = null;
-          data = null;
-      }
+      if (error && error.code === 'PGRST116') { error = null; data = null; }
       
       if (!data) {
         // Fallback: If auth succeeded but profile missing (trigger failed/delayed), create it now.
@@ -805,18 +868,12 @@ const App = () => {
                  role: 'user'
              };
              const { error: insertError } = await supabase.from('profiles').insert(newProfile);
-             
              if (!insertError) {
                  data = newProfile;
-                 // Ensure error is cleared if we successfully created the profile
                  error = null; 
              } else {
-                 // If insert failed (e.g. duplicate key), try fetching one last time
                  const { data: retryData } = await supabase.from('profiles').select('*').eq('id', userId).single();
-                 if (retryData) {
-                     data = retryData;
-                     error = null;
-                 }
+                 if (retryData) { data = retryData; error = null; }
              }
         }
       }
@@ -837,7 +894,6 @@ const App = () => {
             avatarUrl: data.avatar_url || null,
             role: data.role || 'user'
          });
-         // If we are on Auth screen, move to Home
          if(view === 'AUTH' || view === 'SPLASH') setView('HOME');
       } else if (error) {
          console.warn("Profile fetch warning:", error);
@@ -850,13 +906,26 @@ const App = () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
+        // Register Logic: Sign Up -> Create Profile Immediately
         const { data: { user: newUser }, error } = await supabase.auth.signUp({ 
             email, 
             password,
             options: { data: { first_name: firstName, last_name: lastName } }
         });
         if (error) throw error;
-        if(newUser) {
+        
+        if (newUser) {
+            // Force create profile to prevent race conditions
+            const newProfile = {
+                 id: newUser.id,
+                 email: newUser.email,
+                 first_name: firstName,
+                 last_name: lastName,
+                 role: 'user'
+            };
+            const { error: profileError } = await supabase.from('profiles').upsert(newProfile);
+            if(profileError) console.error("Profile creation error:", profileError);
+
             alert('Cont creat! Verifică emailul sau intră în cont.');
             setAuthMode('LOGIN');
         }
@@ -880,7 +949,7 @@ const App = () => {
   }
   
   if (view === 'ADMIN' && user) {
-     return <AdminScreen user={user} onClose={() => setView('HOME')} onError={handleError} onShowSql={() => setShowSqlModal(true)} />;
+     return <AdminScreen user={user} onClose={() => setView('PROFILE')} onError={handleError} onShowSql={() => setShowSqlModal(true)} />;
   }
 
   if (view === 'AUTH' && !user) {
@@ -927,7 +996,6 @@ const App = () => {
 
   // Helper icons for main render
   const MapPinIcon = ({className}:{className?:string}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
-  const ClockIcon = ({className}:{className?:string}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 
   const renderContent = () => {
     switch(view) {
@@ -945,8 +1013,8 @@ const App = () => {
 
                 <section>
                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><GlobeIcon className="w-5 h-5 text-ro-red" /> {t('title_announcements')}</h3>
-                      <button onClick={() => setView('EVENTS_LIST')} className="text-sm text-ro-blue font-semibold">{t('view_all')}</button>
+                      <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Megaphone className="w-5 h-5 text-ro-red" /> {t('title_announcements')}</h3>
+                      <button onClick={() => setView('ANNOUNCEMENTS_LIST')} className="text-sm text-ro-blue font-semibold">{t('view_all')}</button>
                    </div>
                    <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x">
                       {announcements.length === 0 ? (
@@ -1002,8 +1070,8 @@ const App = () => {
                       return (
                          <div key={cat.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                             <div className="p-4 border-b border-gray-50 flex items-center gap-3 bg-gray-50">
-                               <div className="p-2 bg-blue-100 rounded-lg text-ro-blue"><Icon className="w-6 h-6"/></div>
-                               <h3 className="font-bold text-gray-800 text-lg">{cat.title}</h3>
+                                <div className="p-2 bg-blue-100 rounded-lg text-ro-blue"><Icon className="w-6 h-6"/></div>
+                                <h3 className="font-bold text-gray-800 text-lg">{cat.title}</h3>
                             </div>
                             <div className="divide-y divide-gray-100">
                                {cat.subServices.map((sub, idx) => (
@@ -1019,8 +1087,29 @@ const App = () => {
                 </div>
              </div>
           );
+       case 'ANNOUNCEMENTS_LIST':
+            return (
+                <div className="p-4 pb-24 space-y-4">
+                    <h2 className="text-2xl font-bold text-ro-blue mb-4">{t('nav_announcements')}</h2>
+                    {announcements.length === 0 ? (
+                    <div className="text-gray-400 text-sm italic w-full text-center py-4">Nu există anunțuri active.</div>
+                    ) : (
+                    announcements.map(item => (
+                        <div key={item.id} onClick={() => setSelectedItem(item)} className="bg-white rounded-xl shadow-sm p-3 flex gap-3 border border-gray-100 cursor-pointer hover:shadow-md transition-all">
+                            <div className="w-24 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                                <img src={item.imageUrl || 'https://via.placeholder.com/150'} className="w-full h-full object-cover" alt={item.title}/>
+                            </div>
+                            <div className="flex-1 flex flex-col justify-center">
+                                <h4 className="font-bold text-gray-800 line-clamp-2 text-sm">{item.title}</h4>
+                                <p className="text-xs text-gray-600 line-clamp-2 mt-1">{item.description}</p>
+                            </div>
+                        </div>
+                    ))
+                    )}
+                </div>
+            );
        case 'SEND_DOCS':
-          return user ? <SendDocsScreen user={user} t={t} onError={handleError} /> : <div className="p-10 text-center">Te rugăm să te autentifici. <Button onClick={() => setView('AUTH')} className="mt-4">Login</Button></div>;
+          return user ? <SendDocsScreen user={user} t={t} onError={handleError} onBack={() => setView('PROFILE')} /> : <div className="p-10 text-center">Te rugăm să te autentifici. <Button onClick={() => setView('AUTH')} className="mt-4">Login</Button></div>;
        case 'EVENTS_LIST':
           return (
              <div className="p-4 pb-24 space-y-4">
@@ -1043,29 +1132,10 @@ const App = () => {
                  )}
              </div>
           );
-       case 'FAQ':
-          return (
-             <div className="p-4 pb-24">
-                <h2 className="text-2xl font-bold text-ro-blue mb-6">{t('faq_title')}</h2>
-                <div className="space-y-4">
-                   {FAQ_DATA.map(cat => (
-                      <div key={cat.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-                         <h3 className="font-bold text-lg text-ro-blue mb-3 border-b pb-2">{cat.title}</h3>
-                         <div className="space-y-3">
-                            {cat.questions.map((q, idx) => (
-                               <div key={idx} className="bg-gray-50 p-3 rounded-lg">
-                                  <p className="font-semibold text-gray-800 text-sm mb-1">Q: {q.question}</p>
-                                  <p className="text-gray-600 text-sm">A: {q.answer}</p>
-                               </div>
-                            ))}
-                         </div>
-                      </div>
-                   ))}
-                </div>
-             </div>
-          );
+       case 'INFO':
+          return <InfoScreen t={t} />;
        case 'SETTINGS':
-          return <SettingsScreen textSize={textSize} setTextSize={setTextSize} theme={theme} setTheme={setTheme} setView={setView} notifications={notifications} setNotifications={setNotifications} t={t} onShowSql={() => setShowSqlModal(true)} />;
+          return <SettingsScreen textSize={textSize} setTextSize={setTextSize} theme={theme} setTheme={setTheme} setView={setView} notifications={notifications} setNotifications={setNotifications} t={t} />;
        case 'PROFILE':
           return user ? <ProfileScreen user={user} setUser={setUser} onLogout={handleLogout} t={t} onError={handleError} onViewChange={setView} /> : <div className="p-10 text-center">Te rugăm să te autentifici. <Button onClick={() => setView('AUTH')} className="mt-4">Login</Button></div>;
        default:

@@ -28,8 +28,7 @@ export interface Announcement {
   date: string;
   endDate?: string | null; 
   end_date?: string | null; 
-  active: boolean; // Changed from isActive to match DB
-  isActive?: boolean; // Keep for compatibility if needed
+  active: boolean; 
 }
 
 export interface EventItem {
@@ -43,7 +42,6 @@ export interface EventItem {
   imageUrl?: string | null;
   image_url?: string | null;
   active: boolean;
-  isActive?: boolean;
 }
 
 export interface UserDocument {
@@ -89,7 +87,7 @@ export enum TextSize {
   XLARGE = 'text-xl'
 }
 
-export type ViewState = 'SPLASH' | 'AUTH' | 'HOME' | 'SERVICES' | 'SEND_DOCS' | 'EVENTS_LIST' | 'FAQ' | 'SETTINGS' | 'PROFILE' | 'ADMIN';
+export type ViewState = 'SPLASH' | 'AUTH' | 'HOME' | 'SERVICES' | 'ANNOUNCEMENTS_LIST' | 'EVENTS_LIST' | 'INFO' | 'SETTINGS' | 'PROFILE' | 'ADMIN' | 'SEND_DOCS';
 
 export interface NotificationPreferences {
   enabled: boolean;
@@ -98,4 +96,4 @@ export interface NotificationPreferences {
   requests: boolean;
 }
 
-export type SearchCategory = 'ALL' | 'SERVICES' | 'ANNOUNCEMENTS' | 'EVENTS' | 'FAQ';
+export type SearchCategory = 'ALL' | 'SERVICES' | 'ANNOUNCEMENTS' | 'EVENTS' | 'INFO';
