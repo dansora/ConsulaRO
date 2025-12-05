@@ -1,6 +1,4 @@
-
-import React from 'react';
-import { Announcement, EventItem, FaqCategory, LanguageCode, ServiceCategory } from './types';
+import { Announcement, EventItem, FaqCategory, LanguageCode, ServiceCategory } from './types.ts';
 import { 
   FileText, Users, Flag, Globe, FileCheck, Mail, BookOpen, UserCheck, MoreHorizontal 
 } from 'lucide-react';
@@ -17,7 +15,6 @@ export const LANGUAGES: { code: LanguageCode; label: string }[] = [
   { code: 'TR', label: 'Türkçe' },
 ];
 
-// Simple Translation Dictionary
 export const TRANSLATIONS: Record<LanguageCode, Record<string, string>> = {
   RO: {
     welcome: "Bine ai venit!",
@@ -41,6 +38,7 @@ export const TRANSLATIONS: Record<LanguageCode, Record<string, string>> = {
     settings_text_size: "Dimensiune Text",
     settings_theme: "Temă",
     settings_contact: "Contactează Echipa",
+    settings_sql: "Script Bază de Date",
     profile_edit: "Editează Profil",
     profile_save: "Salvează",
     profile_logout: "Delogare",
@@ -63,7 +61,12 @@ export const TRANSLATIONS: Record<LanguageCode, Record<string, string>> = {
     send_docs_desc: "Trimite rapid copii ale documentelor către consulatul tău.",
     upload_text: "Apasă pentru încărcare",
     services_title: "Servicii Consulare",
-    faq_title: "Întrebări Frecvente"
+    faq_title: "Întrebări Frecvente",
+    err_title: "Eroare",
+    btn_show_sql: "Vezi Soluția SQL",
+    btn_close: "Închide",
+    btn_copy: "Copiază",
+    btn_copied: "Copiat!"
   },
   EN: {
     welcome: "Welcome!",
@@ -87,6 +90,7 @@ export const TRANSLATIONS: Record<LanguageCode, Record<string, string>> = {
     settings_text_size: "Text Size",
     settings_theme: "Theme",
     settings_contact: "Contact Team",
+    settings_sql: "Database Script",
     profile_edit: "Edit Profile",
     profile_save: "Save",
     profile_logout: "Logout",
@@ -109,7 +113,12 @@ export const TRANSLATIONS: Record<LanguageCode, Record<string, string>> = {
     send_docs_desc: "Quickly send document copies to your consulate.",
     upload_text: "Tap to upload",
     services_title: "Consular Services",
-    faq_title: "Frequently Asked Questions"
+    faq_title: "Frequently Asked Questions",
+    err_title: "Error",
+    btn_show_sql: "View SQL Solution",
+    btn_close: "Close",
+    btn_copy: "Copy",
+    btn_copied: "Copied!"
   },
   IT: {
     welcome: "Benvenuto!",
@@ -133,6 +142,7 @@ export const TRANSLATIONS: Record<LanguageCode, Record<string, string>> = {
     settings_text_size: "Dimensione Testo",
     settings_theme: "Tema",
     settings_contact: "Contatta Team",
+    settings_sql: "Script Database",
     profile_edit: "Modifica Profilo",
     profile_save: "Salva",
     profile_logout: "Esci",
@@ -155,14 +165,19 @@ export const TRANSLATIONS: Record<LanguageCode, Record<string, string>> = {
     send_docs_desc: "Invia rapidamente copie dei documenti al tuo consolato.",
     upload_text: "Tocca per caricare",
     services_title: "Servizi Consolari",
-    faq_title: "Domande Frequenti"
+    faq_title: "Domande Frequenti",
+    err_title: "Errore",
+    btn_show_sql: "Vedi Soluzione SQL",
+    btn_close: "Chiudi",
+    btn_copy: "Copia",
+    btn_copied: "Copiato!"
   },
-  ES: { welcome: "¡Bienvenido!", auth_login: "Acceso", auth_register: "Registro", btn_login: "Iniciar sesión", btn_create: "Crear cuenta", nav_home: "Inicio", nav_services: "Servicios", nav_send: "Enviar", nav_events: "Eventos", nav_faq: "Preguntas", title_announcements: "Anuncios Importantes", title_events: "Eventos Activos", view_all: "Ver todo", about_app: "Sobre ConsulaRO", search_placeholder: "Buscar...", no_results: "Sin resultados", settings_title: "Ajustes", settings_notifications: "Notificaciones", settings_text_size: "Tamaño texto", settings_theme: "Tema", settings_contact: "Contactar", profile_edit: "Editar Perfil", profile_save: "Guardar", profile_logout: "Cerrar sesión", profile_delete: "Eliminar cuenta", profile_success: "¡Perfil guardado!", profile_error: "Error al guardar.", lbl_firstname: "Nombre", lbl_lastname: "Apellido", lbl_username: "Usuario", lbl_phone: "Teléfono", lbl_address: "Dirección", lbl_city: "Ciudad", lbl_county: "Región", lbl_country: "País", lbl_postal: "Código Postal", cam_start: "Cámara", cam_take: "Tomar foto", cam_cancel: "Cancelar", send_docs_title: "Enviar Documentos", send_docs_desc: "Envía documentos al consulado.", upload_text: "Tocar para subir", services_title: "Servicios Consulares", faq_title: "Preguntas Frecuentes" },
-  FR: { welcome: "Bienvenue!", auth_login: "Connexion", auth_register: "S'inscrire", btn_login: "Se connecter", btn_create: "Créer un compte", nav_home: "Accueil", nav_services: "Services", nav_send: "Envoyer", nav_events: "Événements", nav_faq: "FAQ", title_announcements: "Annonces Importantes", title_events: "Événements Actifs", view_all: "Voir tout", about_app: "À propos de ConsulaRO", search_placeholder: "Rechercher...", no_results: "Aucun résultat", settings_title: "Paramètres", settings_notifications: "Notifications", settings_text_size: "Taille du texte", settings_theme: "Thème", settings_contact: "Contact", profile_edit: "Modifier Profil", profile_save: "Enregistrer", profile_logout: "Déconnexion", profile_delete: "Supprimer compte", profile_success: "Profil enregistré !", profile_error: "Erreur d'enregistrement.", lbl_firstname: "Prénom", lbl_lastname: "Nom", lbl_username: "Nom d'utilisateur", lbl_phone: "Téléphone", lbl_address: "Adresse", lbl_city: "Ville", lbl_county: "Région", lbl_country: "Pays", lbl_postal: "Code Postal", cam_start: "Caméra", cam_take: "Prendre photo", cam_cancel: "Annuler", send_docs_title: "Envoyer Documents", send_docs_desc: "Envoyez des documents au consulat.", upload_text: "Appuyez pour télécharger", services_title: "Services Consulaires", faq_title: "Questions Fréquentes" },
-  DE: { welcome: "Willkommen!", auth_login: "Anmeldung", auth_register: "Registrieren", btn_login: "Anmelden", btn_create: "Konto erstellen", nav_home: "Startseite", nav_services: "Dienstleistungen", nav_send: "Senden", nav_events: "Veranstaltungen", nav_faq: "FAQ", title_announcements: "Wichtige Ankündigungen", title_events: "Aktive Veranstaltungen", view_all: "Alle ansehen", about_app: "Über ConsulaRO", search_placeholder: "Suchen...", no_results: "Keine Ergebnisse", settings_title: "Einstellungen", settings_notifications: "Benachrichtigungen", settings_text_size: "Textgröße", settings_theme: "Thema", settings_contact: "Kontakt", profile_edit: "Profil bearbeiten", profile_save: "Speichern", profile_logout: "Abmelden", profile_delete: "Konto löschen", profile_success: "Profil gespeichert!", profile_error: "Fehler beim Speichern.", lbl_firstname: "Vorname", lbl_lastname: "Nachname", lbl_username: "Benutzername", lbl_phone: "Telefon", lbl_address: "Adresse", lbl_city: "Stadt", lbl_county: "Region", lbl_country: "Land", lbl_postal: "Postleitzahl", cam_start: "Kamera", cam_take: "Foto machen", cam_cancel: "Abbrechen", send_docs_title: "Dokumente senden", send_docs_desc: "Senden Sie Dokumente an das Konsulat.", upload_text: "Zum Hochladen tippen", services_title: "Konsularische Dienstleistungen", faq_title: "Häufig gestellte Fragen" },
-  PT: { welcome: "Bem-vindo!", auth_login: "Login", auth_register: "Registrar", btn_login: "Entrar", btn_create: "Criar conta", nav_home: "Início", nav_services: "Serviços", nav_send: "Enviar", nav_events: "Eventos", nav_faq: "FAQ", title_announcements: "Anúncios Importantes", title_events: "Eventos Ativos", view_all: "Ver tudo", about_app: "Sobre ConsulaRO", search_placeholder: "Pesquisar...", no_results: "Sem resultados", settings_title: "Configurações", settings_notifications: "Notificações", settings_text_size: "Tamanho do texto", settings_theme: "Tema", settings_contact: "Contato", profile_edit: "Editar Perfil", profile_save: "Salvar", profile_logout: "Sair", profile_delete: "Excluir conta", profile_success: "Perfil salvo!", profile_error: "Erro ao salvar.", lbl_firstname: "Nome", lbl_lastname: "Sobrenome", lbl_username: "Nome de usuário", lbl_phone: "Telefone", lbl_address: "Endereço", lbl_city: "Cidade", lbl_county: "Região", lbl_country: "País", lbl_postal: "Código Postal", cam_start: "Câmera", cam_take: "Tirar foto", cam_cancel: "Cancelar", send_docs_title: "Enviar Documentos", send_docs_desc: "Envie documentos ao consulado.", upload_text: "Toque para carregar", services_title: "Serviços Consulares", faq_title: "Perguntas Frecuentes" },
-  HU: { welcome: "Üdvözöljük!", auth_login: "Bejelentkezés", auth_register: "Regisztráció", btn_login: "Belépés", btn_create: "Fiók létrehozása", nav_home: "Főoldal", nav_services: "Szolgáltatások", nav_send: "Küldés", nav_events: "Események", nav_faq: "GYIK", title_announcements: "Fontos közlemények", title_events: "Aktív események", view_all: "Összes megtekintése", about_app: "A ConsulaRO-ról", search_placeholder: "Keresés...", no_results: "Nincs találat", settings_title: "Beállítások", settings_notifications: "Értesítések", settings_text_size: "Szövegméret", settings_theme: "Téma", settings_contact: "Kapcsolat", profile_edit: "Profil szerkesztése", profile_save: "Mentés", profile_logout: "Kijelentkezés", profile_delete: "Fiók törlése", profile_success: "Profil mentve!", profile_error: "Hiba a mentés során.", lbl_firstname: "Keresztnév", lbl_lastname: "Vezetéknév", lbl_username: "Felhasználónév", lbl_phone: "Telefon", lbl_address: "Cím", lbl_city: "Város", lbl_county: "Megye", lbl_country: "Ország", lbl_postal: "Irányítószám", cam_start: "Kamera", cam_take: "Fotó", cam_cancel: "Mégse", send_docs_title: "Dokumentumok küldése", send_docs_desc: "Dokumentumok küldése a konzulátusra.", upload_text: "Koppintson a feltöltéshez", services_title: "Konzuli szolgáltatások", faq_title: "Gyakori kérdések" },
-  TR: { welcome: "Hoş geldiniz!", auth_login: "Giriş", auth_register: "Kayıt", btn_login: "Giriş Yap", btn_create: "Hesap Oluştur", nav_home: "Anasayfa", nav_services: "Hizmetler", nav_send: "Gönder", nav_events: "Etkinlikler", nav_faq: "SSS", title_announcements: "Önemli Duyurular", title_events: "Aktif Etkinlikler", view_all: "Hepsini gör", about_app: "ConsulaRO Hakkında", search_placeholder: "Ara...", no_results: "Sonuç bulunamadı", settings_title: "Ayarlar", settings_notifications: "Bildirimler", settings_text_size: "Metin Boyutu", settings_theme: "Tema", settings_contact: "İletişim", profile_edit: "Profili Düzenle", profile_save: "Kaydet", profile_logout: "Çıkış Yap", profile_delete: "Hesabı Sil", profile_success: "Profil kaydedildi!", profile_error: "Kayıt hatası.", lbl_firstname: "İsim", lbl_lastname: "Soyisim", lbl_username: "Kullanıcı Adı", lbl_phone: "Telefon", lbl_address: "Adres", lbl_city: "Şehir", lbl_county: "Bölge", lbl_country: "Ülke", lbl_postal: "Posta Kodu", cam_start: "Kamera", cam_take: "Fotoğraf Çek", cam_cancel: "İptal", send_docs_title: "Belge Gönder", send_docs_desc: "Belgeleri konsolosluğa gönderin.", upload_text: "Yüklemek için dokunun", services_title: "Konsolosluk Hizmetleri", faq_title: "Sıkça Sorulan Sorular" },
+  ES: { welcome: "¡Bienvenido!", auth_login: "Acceso", auth_register: "Registro", btn_login: "Iniciar sesión", btn_create: "Crear cuenta", nav_home: "Inicio", nav_services: "Servicios", nav_send: "Enviar", nav_events: "Eventos", nav_faq: "Preguntas", title_announcements: "Anuncios Importantes", title_events: "Eventos Activos", view_all: "Ver todo", about_app: "Sobre ConsulaRO", search_placeholder: "Buscar...", no_results: "Sin resultados", settings_title: "Ajustes", settings_notifications: "Notificaciones", settings_text_size: "Tamaño texto", settings_theme: "Tema", settings_contact: "Contactar", settings_sql: "Script SQL", profile_edit: "Editar Perfil", profile_save: "Guardar", profile_logout: "Cerrar sesión", profile_delete: "Eliminar cuenta", profile_success: "¡Perfil guardado!", profile_error: "Error al guardar.", lbl_firstname: "Nombre", lbl_lastname: "Apellido", lbl_username: "Usuario", lbl_phone: "Teléfono", lbl_address: "Dirección", lbl_city: "Ciudad", lbl_county: "Región", lbl_country: "País", lbl_postal: "Código Postal", cam_start: "Cámara", cam_take: "Tomar foto", cam_cancel: "Cancelar", send_docs_title: "Enviar Documentos", send_docs_desc: "Envía documentos al consulado.", upload_text: "Tocar para subir", services_title: "Servicios Consulares", faq_title: "Preguntas Frecuentes", err_title: "Error", btn_show_sql: "Ver SQL", btn_close: "Cerrar", btn_copy: "Copiar", btn_copied: "¡Copiado!" },
+  FR: { welcome: "Bienvenue!", auth_login: "Connexion", auth_register: "S'inscrire", btn_login: "Se connecter", btn_create: "Créer un compte", nav_home: "Accueil", nav_services: "Services", nav_send: "Envoyer", nav_events: "Événements", nav_faq: "FAQ", title_announcements: "Annonces Importantes", title_events: "Événements Actifs", view_all: "Voir tout", about_app: "À propos de ConsulaRO", search_placeholder: "Rechercher...", no_results: "Aucun résultat", settings_title: "Paramètres", settings_notifications: "Notifications", settings_text_size: "Taille du texte", settings_theme: "Thème", settings_contact: "Contact", settings_sql: "Script SQL", profile_edit: "Modifier Profil", profile_save: "Enregistrer", profile_logout: "Déconnexion", profile_delete: "Supprimer compte", profile_success: "Profil enregistré !", profile_error: "Erreur d'enregistrement.", lbl_firstname: "Prénom", lbl_lastname: "Nom", lbl_username: "Nom d'utilisateur", lbl_phone: "Téléphone", lbl_address: "Adresse", lbl_city: "Ville", lbl_county: "Région", lbl_country: "Pays", lbl_postal: "Code Postal", cam_start: "Caméra", cam_take: "Prendre photo", cam_cancel: "Annuler", send_docs_title: "Envoyer Documents", send_docs_desc: "Envoyez des documents au consulat.", upload_text: "Appuyez pour télécharger", services_title: "Services Consulaires", faq_title: "Questions Fréquentes", err_title: "Erreur", btn_show_sql: "Voir SQL", btn_close: "Fermer", btn_copy: "Copier", btn_copied: "Copié!" },
+  DE: { welcome: "Willkommen!", auth_login: "Anmeldung", auth_register: "Registrieren", btn_login: "Anmelden", btn_create: "Konto erstellen", nav_home: "Startseite", nav_services: "Dienstleistungen", nav_send: "Senden", nav_events: "Veranstaltungen", nav_faq: "FAQ", title_announcements: "Wichtige Ankündigungen", title_events: "Aktive Veranstaltungen", view_all: "Alle ansehen", about_app: "Über ConsulaRO", search_placeholder: "Suchen...", no_results: "Keine Ergebnisse", settings_title: "Einstellungen", settings_notifications: "Benachrichtigungen", settings_text_size: "Textgröße", settings_theme: "Thema", settings_contact: "Kontakt", settings_sql: "SQL-Skript", profile_edit: "Profil bearbeiten", profile_save: "Speichern", profile_logout: "Abmelden", profile_delete: "Konto löschen", profile_success: "Profil gespeichert!", profile_error: "Fehler beim Speichern.", lbl_firstname: "Vorname", lbl_lastname: "Nachname", lbl_username: "Benutzername", lbl_phone: "Telefon", lbl_address: "Adresse", lbl_city: "Stadt", lbl_county: "Region", lbl_country: "Land", lbl_postal: "Postleitzahl", cam_start: "Kamera", cam_take: "Foto machen", cam_cancel: "Abbrechen", send_docs_title: "Dokumente senden", send_docs_desc: "Senden Sie Dokumente an das Konsulat.", upload_text: "Zum Hochladen tippen", services_title: "Konsularische Dienstleistungen", faq_title: "Häufig gestellte Fragen", err_title: "Fehler", btn_show_sql: "SQL ansehen", btn_close: "Schließen", btn_copy: "Kopieren", btn_copied: "Kopiert!" },
+  PT: { welcome: "Bem-vindo!", auth_login: "Login", auth_register: "Registrar", btn_login: "Entrar", btn_create: "Criar conta", nav_home: "Início", nav_services: "Serviços", nav_send: "Enviar", nav_events: "Eventos", nav_faq: "FAQ", title_announcements: "Anúncios Importantes", title_events: "Eventos Ativos", view_all: "Ver tudo", about_app: "Sobre ConsulaRO", search_placeholder: "Pesquisar...", no_results: "Sem resultados", settings_title: "Configurações", settings_notifications: "Notificações", settings_text_size: "Tamanho do texto", settings_theme: "Tema", settings_contact: "Contato", settings_sql: "Script SQL", profile_edit: "Editar Perfil", profile_save: "Salvar", profile_logout: "Sair", profile_delete: "Excluir conta", profile_success: "Perfil salvo!", profile_error: "Erro ao salvar.", lbl_firstname: "Nome", lbl_lastname: "Sobrenome", lbl_username: "Nome de usuário", lbl_phone: "Telefone", lbl_address: "Endereço", lbl_city: "Cidade", lbl_county: "Região", lbl_country: "País", lbl_postal: "Código Postal", cam_start: "Câmera", cam_take: "Tirar foto", cam_cancel: "Cancelar", send_docs_title: "Enviar Documentos", send_docs_desc: "Envie documentos ao consulado.", upload_text: "Toque para carregar", services_title: "Serviços Consulares", faq_title: "Perguntas Frecuentes", err_title: "Erro", btn_show_sql: "Ver SQL", btn_close: "Fechar", btn_copy: "Copiar", btn_copied: "Copiado!" },
+  HU: { welcome: "Üdvözöljük!", auth_login: "Bejelentkezés", auth_register: "Regisztráció", btn_login: "Belépés", btn_create: "Fiók létrehozása", nav_home: "Főoldal", nav_services: "Szolgáltatások", nav_send: "Küldés", nav_events: "Események", nav_faq: "GYIK", title_announcements: "Fontos közlemények", title_events: "Aktív események", view_all: "Összes megtekintése", about_app: "A ConsulaRO-ról", search_placeholder: "Keresés...", no_results: "Nincs találat", settings_title: "Beállítások", settings_notifications: "Értesítések", settings_text_size: "Szövegméret", settings_theme: "Téma", settings_contact: "Kapcsolat", settings_sql: "SQL szkript", profile_edit: "Profil szerkesztése", profile_save: "Mentés", profile_logout: "Kijelentkezés", profile_delete: "Fiók törlése", profile_success: "Profil mentve!", profile_error: "Hiba a mentés során.", lbl_firstname: "Keresztnév", lbl_lastname: "Vezetéknév", lbl_username: "Felhasználónév", lbl_phone: "Telefon", lbl_address: "Cím", lbl_city: "Város", lbl_county: "Megye", lbl_country: "Ország", lbl_postal: "Irányítószám", cam_start: "Kamera", cam_take: "Fotó", cam_cancel: "Mégse", send_docs_title: "Dokumentumok küldése", send_docs_desc: "Dokumentumok küldése a konzulátusra.", upload_text: "Koppintson a feltöltéshez", services_title: "Konzuli szolgáltatások", faq_title: "Gyakori kérdések", err_title: "Hiba", btn_show_sql: "SQL Megtekintése", btn_close: "Bezárás", btn_copy: "Másolás", btn_copied: "Másolva!" },
+  TR: { welcome: "Hoş geldiniz!", auth_login: "Giriş", auth_register: "Kayıt", btn_login: "Giriş Yap", btn_create: "Hesap Oluştur", nav_home: "Anasayfa", nav_services: "Hizmetler", nav_send: "Gönder", nav_events: "Etkinlikler", nav_faq: "SSS", title_announcements: "Önemli Duyurular", title_events: "Aktif Etkinlikler", view_all: "Hepsini gör", about_app: "ConsulaRO Hakkında", search_placeholder: "Ara...", no_results: "Sonuç bulunamadı", settings_title: "Ayarlar", settings_notifications: "Bildirimler", settings_text_size: "Metin Boyutu", settings_theme: "Tema", settings_contact: "İletişim", settings_sql: "SQL Komut", profile_edit: "Profili Düzenle", profile_save: "Kaydet", profile_logout: "Çıkış Yap", profile_delete: "Hesabı Sil", profile_success: "Profil kaydedildi!", profile_error: "Kayıt hatası.", lbl_firstname: "İsim", lbl_lastname: "Soyisim", lbl_username: "Kullanıcı Adı", lbl_phone: "Telefon", lbl_address: "Adres", lbl_city: "Şehir", lbl_county: "Bölge", lbl_country: "Ülke", lbl_postal: "Posta Kodu", cam_start: "Kamera", cam_take: "Fotoğraf Çek", cam_cancel: "İptal", send_docs_title: "Belge Gönder", send_docs_desc: "Belgeleri konsolosluğa gönderin.", upload_text: "Yüklemek için dokunun", services_title: "Konsolosluk Hizmetleri", faq_title: "Sıkça Sorulan Sorular", err_title: "Hata", btn_show_sql: "SQL Görüntüle", btn_close: "Kapat", btn_copy: "Kopyala", btn_copied: "Kopyalandı!" },
 };
 
 export const SERVICE_CATEGORIES: ServiceCategory[] = [
@@ -256,97 +271,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
       { name: 'Informații generale', url: 'https://www.mae.ro' }
     ] 
   },
-];
-
-export const MOCK_ANNOUNCEMENTS: Announcement[] = [
-  {
-    id: '1',
-    title: 'Alegeri Prezidențiale 2024',
-    description: 'Ministerul Afacerilor Externe informează cetățenii români din străinătate cu privire la organizarea alegerilor prezidențiale din anul 2024. Vă rugăm să verificați lista secțiilor de votare disponibile în țara dumneavoastră de reședință.',
-    imageUrl: 'https://picsum.photos/600/400?random=1',
-    date: '2024-10-15',
-    active: true
-  },
-  {
-    id: '2',
-    title: 'Program Consulat Vacanță',
-    description: 'În perioada 24 Decembrie - 3 Ianuarie, activitatea cu publicul va fi suspendată, cu excepția cazurilor de urgență majoră (decese, accidente). Vă mulțumim pentru înțelegere.',
-    imageUrl: 'https://picsum.photos/600/400?random=2',
-    date: '2024-12-01',
-    active: true
-  },
-  {
-    id: '3',
-    title: 'Consulate Itinerante',
-    description: 'Echipele consulare mobile se vor deplasa în următoarele orașe: Lyon (Franța), Birmingham (UK), și Dortmund (Germania). Programările se fac exclusiv online.',
-    imageUrl: 'https://picsum.photos/600/400?random=3',
-    date: '2024-11-10',
-    active: true
-  },
-   {
-    id: '4',
-    title: 'Modificări Taxe Consulare',
-    description: 'Vă informăm că începând cu data de 1 ianuarie, anumite taxe consulare vor fi actualizate conform noilor reglementări legislative.',
-    imageUrl: 'https://picsum.photos/600/400?random=10',
-    date: '2024-12-15',
-    active: true
-  },
-  {
-    id: '5',
-    title: 'Programare Online Obligatorie',
-    description: 'Pentru a evita aglomerația și a reduce timpii de așteptare, toate serviciile consulare se efectuează exclusiv pe bază de programare prin portalul econsulat.ro.',
-    imageUrl: 'https://picsum.photos/600/400?random=11',
-    date: '2024-09-20',
-    active: true
-  }
-];
-
-export const MOCK_EVENTS: EventItem[] = [
-  {
-    id: '1',
-    title: 'Ziua Limbii Române',
-    location: 'Institutul Cultural Român',
-    date: '2024-08-31',
-    description: 'Sărbătorim împreună Ziua Limbii Române cu un recital de poezie și un concert de muzică clasică. Intrarea este liberă.',
-    imageUrl: 'https://picsum.photos/600/400?random=4',
-    active: true
-  },
-  {
-    id: '2',
-    title: 'Întâlnire cu Diaspora',
-    location: 'Ambasada României',
-    date: '2024-09-15',
-    description: 'Vă invităm la o discuție deschisă despre problemele comunității românești. Vor fi prezenți reprezentanți ai MAE.',
-    imageUrl: 'https://picsum.photos/600/400?random=5',
-    active: true
-  },
-  {
-    id: '3',
-    title: 'Târgul de Mărțișor',
-    location: 'Centrul Comunitar',
-    date: '2025-03-01',
-    description: 'Veniți să sărbătorim venirea primăverii cu mărțișoare tradiționale, muzică populară și bucate românești.',
-    imageUrl: 'https://picsum.photos/600/400?random=6',
-    active: true
-  },
-  {
-    id: '4',
-    title: 'Festivalul Filmului Românesc',
-    location: 'Cinema Central',
-    date: '2024-11-20',
-    description: 'Proiecții ale celor mai noi filme românești premiate internațional. Sesiuni de Q&A cu regizorii.',
-    imageUrl: 'https://picsum.photos/600/400?random=7',
-    active: true
-  },
-  {
-    id: '5',
-    title: 'Atelier de Pictură pentru Copii',
-    location: 'Biblioteca Românească',
-    date: '2024-10-05',
-    description: 'Un atelier creativ pentru copiii de toate vârstele, dedicat promovării tradițiilor românești prin artă.',
-    imageUrl: 'https://picsum.photos/600/400?random=8',
-    active: true
-  }
 ];
 
 export const FAQ_DATA: FaqCategory[] = [

@@ -23,12 +23,13 @@ export interface Announcement {
   id: string;
   title: string;
   description: string;
-  imageUrl?: string | null; // Optional during creation
-  image_url?: string | null; // DB field matching
+  imageUrl?: string | null; 
+  image_url?: string | null; 
   date: string;
-  endDate?: string | null; // Optional/Null
-  end_date?: string | null; // DB field matching
-  isActive: boolean;
+  endDate?: string | null; 
+  end_date?: string | null; 
+  active: boolean; // Changed from isActive to match DB
+  isActive?: boolean; // Keep for compatibility if needed
 }
 
 export interface EventItem {
@@ -41,7 +42,8 @@ export interface EventItem {
   description: string;
   imageUrl?: string | null;
   image_url?: string | null;
-  isActive: boolean;
+  active: boolean;
+  isActive?: boolean;
 }
 
 export interface UserDocument {

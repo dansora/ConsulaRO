@@ -1,24 +1,25 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Menu, X, Home, Book, Send, HelpCircle, Settings, User, 
-  LogOut, Globe, Moon, Sun, Monitor, Camera, Bell, Calendar,
-  ChevronRight, ChevronLeft, Image as ImageIcon, FileText, Users, Flag, Globe as GlobeIcon, FileCheck, Mail, BookOpen, UserCheck, MoreHorizontal, Search, Shield, Download, Edit, Trash2, Plus, Filter, Save, FileIcon, Eye, ArrowLeft, Upload
+  Home, Book, Send, HelpCircle, Settings, User, 
+  LogOut, Camera, Bell, Calendar,
+  ChevronRight, Search, Shield, Trash2, Plus, Edit, Eye, ArrowLeft, Upload, X, Globe as GlobeIcon, FileText, Save, AlertTriangle, Database
 } from 'lucide-react';
 import { 
   LanguageCode, UserProfile, AppTheme, TextSize, ViewState, 
-  Announcement, EventItem, ServiceCategory, NotificationPreferences, SearchCategory, UserRole, UserDocument
-} from './types';
+  Announcement, EventItem, NotificationPreferences, UserDocument
+} from './types.ts';
 import { 
-  LANGUAGES, MOCK_ANNOUNCEMENTS, MOCK_EVENTS, FAQ_DATA, 
-  SERVICE_CATEGORIES, APP_DESCRIPTION_SHORT, APP_DESCRIPTION_FULL, TRANSLATIONS
-} from './constants';
-import { Modal } from './components/Modal';
-import { Button } from './components/Button';
-import { supabase } from './lib/supabaseClient';
+  LANGUAGES, FAQ_DATA, 
+  SERVICE_CATEGORIES, APP_DESCRIPTION_SHORT, TRANSLATIONS
+} from './constants.ts';
+import { Modal } from './components/Modal.tsx';
+import { Button } from './components/Button.tsx';
+import { supabase } from './lib/supabaseClient.ts';
+import { SQL_SCHEMA } from './lib/schema.ts';
 
 // --- Icon Map & Translation ---
-const IconMap: Record<string, React.ElementType> = {
-  FileText, Users, Flag, Globe: GlobeIcon, FileCheck, Mail, BookOpen, UserCheck, MoreHorizontal
+const IconMap: Record<string, any> = {
+  FileText
 };
 
 const useTranslation = (lang: LanguageCode) => {
@@ -29,6 +30,72 @@ const useTranslation = (lang: LanguageCode) => {
 };
 
 // --- Sub-Components ---
+
+// New: Modal to display SQL code
+const SqlFixModal = ({ isOpen, onClose, t }: { isOpen: boolean; onClose: () => void; t: any }) => {
+  const [copied, setCopied] = useState(false);
+  if (!isOpen) return null;
+  const handleCopy = () => {
+    navigator.clipboard.writeText(SQL_SCHEMA);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={t('settings_sql')}>
+      <div className="space-y-4">
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+          <p className="text-sm text-yellow-700">
+            Dacă întâmpinați erori (ex: 400 Bad Request, lipsă coloane), copiați acest script și rulați-l în <strong>Supabase Dashboard &gt; SQL Editor</strong>.
+          </p>
+        </div>
+        <div className="relative">
+          <pre className="bg-gray-800 text-gray-100 p-4 rounded-lg text-xs overflow-auto h-64 custom-scrollbar whitespace-pre-wrap">
+            {SQL_SCHEMA}
+          </pre>
+          <button 
+            onClick={handleCopy}
+            className="absolute top-2 right-2 bg-white text-gray-800 px-3 py-1 rounded text-xs font-bold shadow hover:bg-gray-100 flex items-center gap-1"
+          >
+            {copied ? t('btn_copied') : t('btn_copy')}
+          </button>
+        </div>
+        <Button fullWidth onClick={onClose}>{t('btn_close')}</Button>
+      </div>
+    </Modal>
+  );
+};
+
+// New: Modal to display Errors with option to show SQL
+const ErrorDisplayModal = ({ error, isOpen, onClose, onShowSql, t }: any) => {
+  if (!isOpen || !error) return null;
+  
+  let errorMessage = "Unknown Error";
+  if (typeof error === 'string') errorMessage = error;
+  else if (error.message) errorMessage = error.message;
+  else errorMessage = JSON.stringify(error, null, 2);
+
+  const isSqlError = errorMessage.includes("PGRST") || errorMessage.includes("column") || errorMessage.includes("relation") || errorMessage.includes("400");
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={t('err_title')}>
+      <div className="space-y-4 text-center">
+        <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+          <AlertTriangle className="w-6 h-6 text-red-600" />
+        </div>
+        <h3 className="text-lg font-medium text-gray-900">A apărut o problemă</h3>
+        <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded border border-gray-200 break-words font-mono text-left max-h-40 overflow-y-auto">
+          {errorMessage}
+        </p>
+        {isSqlError && <p className="text-xs text-blue-600">Această eroare sugerează o problemă cu baza de date.</p>}
+        <div className="grid grid-cols-2 gap-3">
+           <Button variant="ghost" onClick={onClose}>{t('btn_close')}</Button>
+           <Button onClick={() => { onClose(); onShowSql(); }}>{t('btn_show_sql')}</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
   const [bgClass, setBgClass] = useState('bg-ro-blue');
   useEffect(() => {
@@ -54,7 +121,7 @@ const Header = ({ currentLang, setLang, onProfileClick, onSettingsClick, onSearc
       <div className="relative flex items-center justify-between px-4 h-full">
         <div className="flex items-center space-x-3 z-10 w-auto">
            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-md overflow-hidden border-2 border-white/50">
-             <img src="/ConsulaRO.png" alt="App Logo" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/7/70/Coat_of_arms_of_Romania.svg'; }} />
+             <img src="/logo.png" alt="App Logo" className="w-full h-full object-contain p-1" onError={(e) => { (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/7/70/Coat_of_arms_of_Romania.svg'; }} />
            </div>
            {isLoggedIn && ( <button onClick={onSearchClick} className="text-white bg-black/20 hover:bg-black/30 transition-colors p-2 rounded-full"><Search className="w-5 h-5" /></button> )}
         </div>
@@ -145,7 +212,7 @@ const DetailModal = ({ isOpen, onClose, title, imageUrl, children }: any) => {
 };
 
 // --- ADMIN SCREEN ---
-const AdminScreen = ({ user, onClose }: any) => {
+const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
   const [tab, setTab] = useState<'USERS' | 'ANNOUNCEMENTS' | 'EVENTS' | 'DOCUMENTS'>('USERS');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [docs, setDocs] = useState<UserDocument[]>([]);
@@ -163,47 +230,55 @@ const AdminScreen = ({ user, onClose }: any) => {
   const fetchData = async () => {
     try {
       if (tab === 'USERS') {
-        const { data } = await supabase.from('profiles').select('*');
-        if (data) setUsers(data.map((u:any) => ({...u, avatarUrl: u.avatar_url, firstName: u.first_name, lastName: u.last_name})));
+        const { data, error } = await supabase.from('profiles').select('*');
+        if (error) throw error;
+        if (data) setUsers(data.map((u:any) => ({
+            ...u, 
+            avatarUrl: u.avatar_url, 
+            firstName: u.first_name, 
+            lastName: u.last_name, 
+            postCode: u.post_code
+        })));
       } else if (tab === 'DOCUMENTS') {
-         const { data } = await supabase.from('user_documents').select('*').order('created_at', { ascending: false });
+         const { data, error } = await supabase.from('user_documents').select('*').order('created_at', { ascending: false });
+         if (error) throw error;
          if (data) setDocs(data as any);
       } else if (tab === 'ANNOUNCEMENTS') {
-   const { data, error } = await supabase.from('announcements').select('*').order('date', { ascending: false });
-   if(error) throw error;
-   if (data) setAnnouncements(data.map((i:any) => ({
-       ...i, 
-       imageUrl: i.image_url, 
-       endDate: i.end_date,
-       // NOU: Asigură maparea pentru starea activă
-       isActive: i.is_active // Mapează is_active (DB) la isActive (App)
-   })));
-} else if (tab === 'EVENTS') {
-   const { data, error } = await supabase.from('events').select('*').order('date', { ascending: false });
-   if(error) throw error;
-   if (data) setEvents(data.map((i:any) => ({
-       ...i, 
-       imageUrl: i.image_url, 
-       endDate: i.end_date,
-       // NOU: Asigură maparea pentru starea activă
-       isActive: i.is_active // Mapează is_active (DB) la isActive (App)
-   })));
-} catch (error: any) {
+         const { data, error } = await supabase.from('announcements').select('*').order('date', { ascending: false });
+         if(error) throw error;
+         if (data) setAnnouncements(data.map((i:any) => ({
+             ...i, 
+             imageUrl: i.image_url, 
+             endDate: i.end_date, 
+             active: i.active
+         })));
+      } else if (tab === 'EVENTS') {
+         const { data, error } = await supabase.from('events').select('*').order('date', { ascending: false });
+         if(error) throw error;
+         if (data) setEvents(data.map((i:any) => ({
+             ...i, 
+             imageUrl: i.image_url, 
+             endDate: i.end_date, 
+             active: i.active
+         })));
+      }
+    } catch (error: any) {
        console.error("Fetch Error:", error);
-       alert("Eroare la încărcarea datelor: " + error.message);
+       onError(error);
     }
   };
 
   const deleteItem = async (table: string, id: string) => {
     if(!confirm('Sigur doriți să ștergeți?')) return;
-    await supabase.from(table).delete().eq('id', id);
-    fetchData();
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if(error) onError(error);
+    else fetchData();
   };
 
   const saveItem = async (table: string, data: any) => {
      setSaving(true);
      try {
-       // FIX: Clean Date fields. If empty string, send null to DB.
+       // Convert Date fields. If empty string, send null to DB to avoid 400 Bad Request
        const cleanDate = (d: string) => (d && d.trim() !== '' ? d : null);
 
        const payload = {
@@ -230,8 +305,7 @@ const AdminScreen = ({ user, onClose }: any) => {
        setIsPreviewMode(false);
        fetchData();
      } catch(e:any) {
-        alert('Eroare salvare: ' + e.message);
-        console.error(e);
+        onError(e);
      } finally {
         setSaving(false);
      }
@@ -250,7 +324,7 @@ const AdminScreen = ({ user, onClose }: any) => {
       const { data: { publicUrl } } = supabase.storage.from('content_images').getPublicUrl(filePath);
       setEditingItem({ ...editingItem, image_url: publicUrl, imageUrl: publicUrl });
     } catch (error: any) {
-      alert('Eroare upload: ' + error.message);
+      onError(error);
     } finally {
       setUploadingImage(false);
     }
@@ -292,12 +366,18 @@ const AdminScreen = ({ user, onClose }: any) => {
 
   return (
     <div className="flex flex-col h-full bg-gray-100">
-      <div className="bg-gray-800 text-white p-4 flex justify-between items-center shadow-md"><h2 className="text-xl font-bold flex items-center gap-2"><Shield /> Admin</h2><button onClick={onClose} className="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600">Ieșire</button></div>
+      <div className="bg-gray-800 text-white p-4 flex justify-between items-center shadow-md">
+          <h2 className="text-xl font-bold flex items-center gap-2"><Shield /> Admin</h2>
+          <div className="flex items-center gap-2">
+             <button onClick={onShowSql} className="text-xs bg-blue-600 px-3 py-1 rounded hover:bg-blue-500 flex items-center gap-1"><Database className="w-3 h-3"/> SQL</button>
+             <button onClick={onClose} className="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600">Ieșire</button>
+          </div>
+      </div>
       <div className="flex bg-white shadow-sm overflow-x-auto">{['USERS', 'ANNOUNCEMENTS', 'EVENTS', 'DOCUMENTS'].map(t => (<button key={t} onClick={() => setTab(t as any)} className={`px-4 py-3 font-bold text-sm whitespace-nowrap ${tab === t ? 'text-ro-blue border-b-2 border-ro-blue bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}>{t}</button>))}</div>
       <div className="flex-1 overflow-y-auto p-4">
         {tab === 'USERS' && (<div className="grid grid-cols-1 md:grid-cols-2 gap-4">{users.map(u => (<div key={u.id} className="bg-white rounded-lg shadow p-3 flex gap-3 border"><div className="w-1/3"><img src={u.avatarUrl || 'https://via.placeholder.com/150'} className="w-full h-24 object-cover rounded" alt=""/></div><div className="w-2/3 text-sm"><div className="font-bold">{u.firstName} {u.lastName}</div><div>{u.email}</div><div className="text-xs bg-gray-100 p-1 rounded inline-block mt-1">{u.role}</div></div></div>))}</div>)}
         {(tab === 'ANNOUNCEMENTS' || tab === 'EVENTS') && (
-           <div><div className="flex justify-between mb-4"><Button onClick={() => { setEditingItem({}); setIsPreviewMode(false); setIsEditModalOpen(true); }}><Plus className="w-4 h-4 mr-1 inline"/> Adaugă</Button></div><div className="space-y-3">{(tab === 'ANNOUNCEMENTS' ? announcements : events).map((item: any) => (<div key={item.id} className="bg-white p-3 rounded-lg shadow border flex justify-between items-center"><div className="flex items-center gap-3"><img src={item.image_url || item.imageUrl} className="w-12 h-12 object-cover rounded" alt=""/><div className="font-bold text-sm">{item.title}</div></div><div className="flex gap-2"><button onClick={() => { setEditingItem(item); setIsPreviewMode(false); setIsEditModalOpen(true); }} className="p-2 bg-blue-50 text-blue-600 rounded"><Edit className="w-4 h-4"/></button><button onClick={() => deleteItem(tab === 'ANNOUNCEMENTS' ? 'announcements' : 'events', item.id)} className="p-2 bg-red-50 text-red-600 rounded"><Trash2 className="w-4 h-4"/></button></div></div>))}</div></div>
+           <div><div className="flex justify-between mb-4"><Button onClick={() => { setEditingItem({active: true}); setIsPreviewMode(false); setIsEditModalOpen(true); }}><Plus className="w-4 h-4 mr-1 inline"/> Adaugă</Button></div><div className="space-y-3">{(tab === 'ANNOUNCEMENTS' ? announcements : events).map((item: any) => (<div key={item.id} className="bg-white p-3 rounded-lg shadow border flex justify-between items-center"><div className="flex items-center gap-3"><img src={item.image_url || item.imageUrl} className="w-12 h-12 object-cover rounded" alt=""/><div className="font-bold text-sm">{item.title}</div></div><div className="flex gap-2"><button onClick={() => { setEditingItem(item); setIsPreviewMode(false); setIsEditModalOpen(true); }} className="p-2 bg-blue-50 text-blue-600 rounded"><Edit className="w-4 h-4"/></button><button onClick={() => deleteItem(tab === 'ANNOUNCEMENTS' ? 'announcements' : 'events', item.id)} className="p-2 bg-red-50 text-red-600 rounded"><Trash2 className="w-4 h-4"/></button></div></div>))}</div></div>
         )}
       </div>
       <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title={isPreviewMode ? 'Previzualizare' : 'Editare'}>{isPreviewMode ? renderPreview() : renderEditForm()}</Modal>
@@ -305,20 +385,31 @@ const AdminScreen = ({ user, onClose }: any) => {
   );
 };
 
-// --- SETTINGS SCREEN (Unchanged) ---
-const SettingsScreen = ({ textSize, setTextSize, theme, setTheme, setView, notifications, setNotifications, t }: any) => {
-  return ( <div className="p-4 space-y-6"><h2 className="text-2xl font-bold text-ro-blue mb-4">{t('settings_title')}</h2><div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100"><h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Bell className="w-4 h-4" /> Notificări</h3><label className="flex items-center justify-between"><span className="text-gray-700">Activează</span><input type="checkbox" checked={notifications.enabled} onChange={e => setNotifications({...notifications, enabled: e.target.checked})} /></label></div></div> );
+// --- SETTINGS SCREEN ---
+const SettingsScreen = ({ textSize, setTextSize, theme, setTheme, setView, notifications, setNotifications, t, onShowSql }: any) => {
+  return ( 
+      <div className="p-4 space-y-6">
+          <h2 className="text-2xl font-bold text-ro-blue mb-4">{t('settings_title')}</h2>
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Bell className="w-4 h-4" /> Notificări</h3>
+              <label className="flex items-center justify-between"><span className="text-gray-700">Activează</span><input type="checkbox" checked={notifications.enabled} onChange={e => setNotifications({...notifications, enabled: e.target.checked})} /></label>
+          </div>
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Database className="w-4 h-4" /> Mentenanță</h3>
+              <Button variant="secondary" fullWidth onClick={onShowSql} className="flex items-center justify-center gap-2"><Database className="w-4 h-4"/> {t('settings_sql')}</Button>
+          </div>
+      </div> 
+    );
 };
 
 // --- PROFILE SCREEN ---
-const ProfileScreen = ({ user, setUser, onLogout, t }: any) => {
+const ProfileScreen = ({ user, setUser, onLogout, t, onError }: any) => {
    const [isEditing, setIsEditing] = useState(false);
    const [tempUser, setTempUser] = useState(user);
    const [uploadingAvatar, setUploadingAvatar] = useState(false);
    const [showCamera, setShowCamera] = useState(false);
    const videoRef = useRef<HTMLVideoElement>(null);
 
-   // FIX: Use tempUser avatar when editing to show immediate feedback
    const displayAvatar = isEditing ? (tempUser.avatarUrl || user.avatarUrl) : user.avatarUrl;
 
    const startCamera = async () => { setShowCamera(true); try { const stream = await navigator.mediaDevices.getUserMedia({ video: true }); if (videoRef.current) videoRef.current.srcObject = stream; } catch(e) { alert('Err Camera'); setShowCamera(false); } };
@@ -334,9 +425,8 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: any) => {
           const { error: uploadError } = await supabase.storage.from('profile_images').upload(filePath, file);
           if (uploadError) throw uploadError;
           const { data: { publicUrl } } = supabase.storage.from('profile_images').getPublicUrl(filePath);
-          // Update tempUser immediately
           setTempUser({...tempUser, avatarUrl: publicUrl});
-       } catch (e:any) { alert('Err upload: ' + e.message); } finally { setUploadingAvatar(false); }
+       } catch (e:any) { onError(e); } finally { setUploadingAvatar(false); }
    };
    
    const handleSave = async () => {
@@ -353,7 +443,7 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: any) => {
                 country: tempUser.country || null,
                 post_code: tempUser.postCode || null,
                 username: tempUser.username || null,
-                avatar_url: tempUser.avatarUrl || null, // Ensure avatar is saved
+                avatar_url: tempUser.avatarUrl || null, 
                 updated_at: new Date(),
              };
              const { error } = await supabase.from('profiles').upsert({ id: authUser.id, ...updates }, { onConflict: 'id' });
@@ -362,11 +452,10 @@ const ProfileScreen = ({ user, setUser, onLogout, t }: any) => {
         setUser(tempUser);
         setIsEditing(false);
         alert(t('profile_success'));
-      } catch (e: any) { alert(`${t('profile_error')} ${e.message}`); }
+      } catch (e: any) { onError(e); }
    };
    
-   // ... (handleDeleteAccount same as before)
-   const handleDeleteAccount = async () => { if (window.confirm('Stergeti contul?')) { try { const { data: { user: authUser } } = await supabase.auth.getUser(); if (authUser) { await supabase.from('profiles').delete().eq('id', authUser.id); onLogout(); } } catch (e:any) { alert(e.message); } } };
+   const handleDeleteAccount = async () => { if (window.confirm('Ești sigur că vrei să ștergi contul? Această acțiune este ireversibilă.')) { try { const { data: { user: authUser } } = await supabase.auth.getUser(); if (authUser) { await supabase.from('profiles').delete().eq('id', authUser.id); onLogout(); } } catch (e:any) { onError(e); } } };
 
    return (
      <div className="p-4 pb-24">
@@ -426,9 +515,13 @@ const App = () => {
   const [theme, setTheme] = useState<AppTheme>(AppTheme.AUTO);
   const [textSize, setTextSize] = useState<TextSize>(TextSize.MEDIUM);
   
-  // Data State
-  const [announcements, setAnnouncements] = useState<Announcement[]>(MOCK_ANNOUNCEMENTS);
-  const [events, setEvents] = useState<EventItem[]>(MOCK_EVENTS);
+  // New States for Error/SQL Modals
+  const [showSqlModal, setShowSqlModal] = useState(false);
+  const [errorModal, setErrorModal] = useState<{isOpen: boolean, error: any}>({isOpen: false, error: null});
+
+  // Data State - Initialize empty, fetch from DB
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [events, setEvents] = useState<EventItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<Announcement | EventItem | null>(null);
 
   // Auth State
@@ -439,6 +532,11 @@ const App = () => {
   const [lastName, setLastName] = useState('');
 
   const t = useTranslation(lang);
+
+  const handleError = (error: any) => {
+    console.error("Global Error Handler:", error);
+    setErrorModal({ isOpen: true, error });
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -459,11 +557,21 @@ const App = () => {
 
   useEffect(() => {
      const fetchContent = async () => {
-        const { data: ann } = await supabase.from('announcements').select('*').eq('active', true).order('date', {ascending: false});
-        if(ann && ann.length > 0) setAnnouncements(ann.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date})));
+        const { data: ann, error: annErr } = await supabase.from('announcements').select('*').eq('active', true).order('date', {ascending: false});
+        if(annErr) {
+            console.error("Announcements Fetch Error:", JSON.stringify(annErr, null, 2));
+            // Do not use mock data fallback
+        } else {
+            if(ann) setAnnouncements(ann.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date, active: i.active})));
+        }
         
-        const { data: ev } = await supabase.from('events').select('*').eq('active', true).order('date', {ascending: false});
-        if(ev && ev.length > 0) setEvents(ev.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date})));
+        const { data: ev, error: evErr } = await supabase.from('events').select('*').eq('active', true).order('date', {ascending: false});
+        if(evErr) {
+            console.error("Events Fetch Error:", JSON.stringify(evErr, null, 2));
+            // Do not use mock data fallback
+        } else {
+            if(ev) setEvents(ev.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date, active: i.active})));
+        }
      };
      fetchContent();
   }, []);
@@ -487,6 +595,9 @@ const App = () => {
             role: data.role || 'user'
          });
          if(view === 'AUTH' || view === 'SPLASH') setView('HOME');
+      } else if (error) {
+         // Silently fail on profile fetch if not found (new user scenario handled by trigger or manual create), but log it.
+         console.warn("Profile fetch warning:", error);
       }
   };
 
@@ -508,7 +619,7 @@ const App = () => {
         }
       }
     } catch (e: any) {
-      alert(e.message);
+      handleError(e);
     }
   };
 
@@ -526,7 +637,7 @@ const App = () => {
   }
   
   if (view === 'ADMIN' && user) {
-     return <AdminScreen user={user} onClose={() => setView('HOME')} />;
+     return <AdminScreen user={user} onClose={() => setView('HOME')} onError={handleError} onShowSql={() => setShowSqlModal(true)} />;
   }
 
   if (view === 'AUTH' && !user) {
@@ -534,7 +645,7 @@ const App = () => {
        <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
           <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
              <div className="mx-auto h-20 w-20 bg-white rounded-full flex items-center justify-center shadow-md mb-4 border-2 border-gray-100 overflow-hidden">
-                <img src="/ConsulaRO.png" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/7/70/Coat_of_arms_of_Romania.svg'; }} alt="Logo" />
+                <img src="/logo.png" className="w-full h-full object-contain p-2" onError={(e) => { (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/7/70/Coat_of_arms_of_Romania.svg'; }} alt="Logo" />
              </div>
              <h2 className="text-3xl font-extrabold text-ro-blue">ConsulaRO</h2>
              <p className="mt-2 text-gray-600">{authMode === 'LOGIN' ? t('auth_login') : t('auth_register')}</p>
@@ -588,22 +699,26 @@ const App = () => {
 
                 <section>
                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Flag className="w-5 h-5 text-ro-red" /> {t('title_announcements')}</h3>
+                      <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><GlobeIcon className="w-5 h-5 text-ro-red" /> {t('title_announcements')}</h3>
                       <button onClick={() => setView('EVENTS_LIST')} className="text-sm text-ro-blue font-semibold">{t('view_all')}</button>
                    </div>
                    <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x">
-                      {announcements.map(item => (
-                         <div key={item.id} onClick={() => setSelectedItem(item)} className="snap-center min-w-[280px] bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-all border border-gray-100">
-                            <div className="h-32 bg-gray-200 relative">
-                               <img src={item.imageUrl} className="w-full h-full object-cover" alt={item.title}/>
-                               <div className="absolute top-2 right-2 bg-ro-red text-white text-xs px-2 py-1 rounded-full font-bold shadow">{item.date}</div>
-                            </div>
-                            <div className="p-3">
-                               <h4 className="font-bold text-gray-800 truncate">{item.title}</h4>
-                               <p className="text-sm text-gray-500 line-clamp-2 mt-1">{item.description}</p>
-                            </div>
-                         </div>
-                      ))}
+                      {announcements.length === 0 ? (
+                         <div className="text-gray-400 text-sm italic w-full text-center py-4">Nu există anunțuri momentan.</div>
+                      ) : (
+                        announcements.map(item => (
+                           <div key={item.id} onClick={() => setSelectedItem(item)} className="snap-center min-w-[280px] bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-all border border-gray-100">
+                              <div className="h-32 bg-gray-200 relative">
+                                 <img src={item.imageUrl || 'https://via.placeholder.com/300x200'} className="w-full h-full object-cover" alt={item.title}/>
+                                 <div className="absolute top-2 right-2 bg-ro-red text-white text-xs px-2 py-1 rounded-full font-bold shadow">{item.date}</div>
+                              </div>
+                              <div className="p-3">
+                                 <h4 className="font-bold text-gray-800 truncate">{item.title}</h4>
+                                 <p className="text-sm text-gray-500 line-clamp-2 mt-1">{item.description}</p>
+                              </div>
+                           </div>
+                        ))
+                      )}
                    </div>
                 </section>
 
@@ -613,18 +728,22 @@ const App = () => {
                       <button onClick={() => setView('EVENTS_LIST')} className="text-sm text-ro-blue font-semibold">{t('view_all')}</button>
                    </div>
                    <div className="space-y-3">
-                      {events.slice(0, 3).map(event => (
-                         <div key={event.id} onClick={() => setSelectedItem(event)} className="bg-white rounded-xl shadow-sm p-3 flex gap-3 border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors">
-                            <div className="w-20 h-20 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-                               <img src={event.imageUrl} className="w-full h-full object-cover" alt={event.title}/>
-                            </div>
-                            <div className="flex-1">
-                               <h4 className="font-bold text-gray-800 line-clamp-1">{event.title}</h4>
-                               <div className="text-xs text-ro-blue font-semibold mt-1 flex items-center gap-1"><MapPinIcon className="w-3 h-3"/> {event.location}</div>
-                               <div className="text-xs text-gray-500 mt-1 flex items-center gap-1"><ClockIcon className="w-3 h-3"/> {event.date}</div>
-                            </div>
-                         </div>
-                      ))}
+                      {events.length === 0 ? (
+                         <div className="text-gray-400 text-sm italic w-full text-center py-4">Nu există evenimente active.</div>
+                      ) : (
+                        events.slice(0, 3).map(event => (
+                           <div key={event.id} onClick={() => setSelectedItem(event)} className="bg-white rounded-xl shadow-sm p-3 flex gap-3 border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors">
+                              <div className="w-20 h-20 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                                 <img src={event.imageUrl || 'https://via.placeholder.com/150'} className="w-full h-full object-cover" alt={event.title}/>
+                              </div>
+                              <div className="flex-1">
+                                 <h4 className="font-bold text-gray-800 line-clamp-1">{event.title}</h4>
+                                 <div className="text-xs text-ro-blue font-semibold mt-1 flex items-center gap-1"><MapPinIcon className="w-3 h-3"/> {event.location}</div>
+                                 <div className="text-xs text-gray-500 mt-1 flex items-center gap-1"><ClockIcon className="w-3 h-3"/> {event.date}</div>
+                              </div>
+                           </div>
+                        ))
+                      )}
                    </div>
                 </section>
              </div>
@@ -678,23 +797,27 @@ const App = () => {
           return (
              <div className="p-4 pb-24 space-y-4">
                  <h2 className="text-2xl font-bold text-ro-blue mb-4">{t('nav_events')}</h2>
-                 {events.map(event => (
-                    <div key={event.id} onClick={() => setSelectedItem(event)} className="bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-all border border-gray-100">
-                       <div className="h-40 relative">
-                          <img src={event.imageUrl} className="w-full h-full object-cover" alt={event.title}/>
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                             <h3 className="text-white font-bold text-lg">{event.title}</h3>
-                             <p className="text-white/80 text-sm flex items-center gap-1"><MapPinIcon className="w-3 h-3"/> {event.location}</p>
+                 {events.length === 0 ? (
+                    <div className="text-gray-400 text-sm italic w-full text-center py-4">Nu există evenimente active.</div>
+                 ) : (
+                    events.map(event => (
+                       <div key={event.id} onClick={() => setSelectedItem(event)} className="bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-all border border-gray-100">
+                          <div className="h-40 relative">
+                             <img src={event.imageUrl || 'https://via.placeholder.com/300x200'} className="w-full h-full object-cover" alt={event.title}/>
+                             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
+                                <h3 className="text-white font-bold text-lg">{event.title}</h3>
+                                <p className="text-white/80 text-sm flex items-center gap-1"><MapPinIcon className="w-3 h-3"/> {event.location}</p>
+                             </div>
+                             <div className="absolute top-2 right-2 bg-white text-gray-900 text-xs font-bold px-2 py-1 rounded shadow">
+                                {event.date}
+                             </div>
                           </div>
-                          <div className="absolute top-2 right-2 bg-white text-gray-900 text-xs font-bold px-2 py-1 rounded shadow">
-                             {event.date}
+                          <div className="p-4">
+                             <p className="text-gray-600 line-clamp-2 text-sm">{event.description}</p>
                           </div>
                        </div>
-                       <div className="p-4">
-                          <p className="text-gray-600 line-clamp-2 text-sm">{event.description}</p>
-                       </div>
-                    </div>
-                 ))}
+                    ))
+                 )}
              </div>
           );
        case 'FAQ':
@@ -719,9 +842,9 @@ const App = () => {
              </div>
           );
        case 'SETTINGS':
-          return <SettingsScreen textSize={textSize} setTextSize={setTextSize} theme={theme} setTheme={setTheme} setView={setView} notifications={notifications} setNotifications={setNotifications} t={t} />;
+          return <SettingsScreen textSize={textSize} setTextSize={setTextSize} theme={theme} setTheme={setTheme} setView={setView} notifications={notifications} setNotifications={setNotifications} t={t} onShowSql={() => setShowSqlModal(true)} />;
        case 'PROFILE':
-          return user ? <ProfileScreen user={user} setUser={setUser} onLogout={handleLogout} t={t} /> : <div className="p-10 text-center">Te rugăm să te autentifici. <Button onClick={() => setView('AUTH')} className="mt-4">Login</Button></div>;
+          return user ? <ProfileScreen user={user} setUser={setUser} onLogout={handleLogout} t={t} onError={handleError} /> : <div className="p-10 text-center">Te rugăm să te autentifici. <Button onClick={() => setView('AUTH')} className="mt-4">Login</Button></div>;
        default:
           return null;
     }
@@ -771,6 +894,15 @@ const App = () => {
               </div>
            )}
         </DetailModal>
+
+        <SqlFixModal isOpen={showSqlModal} onClose={() => setShowSqlModal(false)} t={t} />
+        <ErrorDisplayModal 
+          isOpen={errorModal.isOpen} 
+          error={errorModal.error} 
+          onClose={() => setErrorModal({isOpen: false, error: null})} 
+          onShowSql={() => setShowSqlModal(true)} 
+          t={t}
+        />
      </div>
   );
 };
