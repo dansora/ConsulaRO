@@ -169,15 +169,26 @@ const AdminScreen = ({ user, onClose }: any) => {
          const { data } = await supabase.from('user_documents').select('*').order('created_at', { ascending: false });
          if (data) setDocs(data as any);
       } else if (tab === 'ANNOUNCEMENTS') {
-         const { data, error } = await supabase.from('announcements').select('*').order('date', { ascending: false });
-         if(error) throw error;
-         if (data) setAnnouncements(data.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date})));
-      } else if (tab === 'EVENTS') {
-         const { data, error } = await supabase.from('events').select('*').order('date', { ascending: false });
-         if(error) throw error;
-         if (data) setEvents(data.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date})));
-      }
-    } catch (error: any) {
+   const { data, error } = await supabase.from('announcements').select('*').order('date', { ascending: false });
+   if(error) throw error;
+   if (data) setAnnouncements(data.map((i:any) => ({
+       ...i, 
+       imageUrl: i.image_url, 
+       endDate: i.end_date,
+       // NOU: Asigură maparea pentru starea activă
+       isActive: i.is_active // Mapează is_active (DB) la isActive (App)
+   })));
+} else if (tab === 'EVENTS') {
+   const { data, error } = await supabase.from('events').select('*').order('date', { ascending: false });
+   if(error) throw error;
+   if (data) setEvents(data.map((i:any) => ({
+       ...i, 
+       imageUrl: i.image_url, 
+       endDate: i.end_date,
+       // NOU: Asigură maparea pentru starea activă
+       isActive: i.is_active // Mapează is_active (DB) la isActive (App)
+   })));
+} catch (error: any) {
        console.error("Fetch Error:", error);
        alert("Eroare la încărcarea datelor: " + error.message);
     }
