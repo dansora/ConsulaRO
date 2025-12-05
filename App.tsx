@@ -74,7 +74,7 @@ const ErrorDisplayModal = ({ error, isOpen, onClose, onShowSql, t }: any) => {
   else if (error.message) errorMessage = error.message;
   else errorMessage = JSON.stringify(error, null, 2);
 
-  const isSqlError = errorMessage.includes("PGRST") || errorMessage.includes("column") || errorMessage.includes("relation") || errorMessage.includes("400");
+  const isSqlError = errorMessage.includes("PGRST") || errorMessage.includes("column") || errorMessage.includes("relation") || errorMessage.includes("400") || errorMessage.includes("23502");
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t('err_title')}>
@@ -283,7 +283,7 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
 
        const payload = {
           title: data.title,
-          description: data.description, 
+          description: data.description || '', // Ensure description is sent, default to empty string to avoid null issues if schema not updated
           image_url: data.image_url || data.imageUrl,
           date: cleanDate(data.date),
           end_date: cleanDate(data.end_date || data.endDate),
@@ -294,13 +294,15 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
           (payload as any).location = data.location;
        }
 
+       let error;
        if (data.id) {
-          const { error } = await supabase.from(table).update(payload).eq('id', data.id);
-          if (error) throw error;
+          ({ error } = await supabase.from(table).update(payload).eq('id', data.id));
        } else {
-          const { error } = await supabase.from(table).insert(payload);
-          if (error) throw error;
+          ({ error } = await supabase.from(table).insert(payload));
        }
+
+       if (error) throw error;
+
        setIsEditModalOpen(false);
        setIsPreviewMode(false);
        fetchData();
