@@ -262,24 +262,33 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchData();
   }, [tab]);
 
   const fetchData = async () => {
-    if (tab === 'USERS') {
-      const { data } = await supabase.from('profiles').select('*');
-      if (data) setUsers(data as any);
-    } else if (tab === 'DOCUMENTS') {
-       const { data } = await supabase.from('user_documents').select('*').order('created_at', { ascending: false });
-       if (data) setDocs(data as any);
-    } else if (tab === 'ANNOUNCEMENTS') {
-       const { data } = await supabase.from('announcements').select('*').order('date', { ascending: false });
-       if (data) setAnnouncements(data as any);
-    } else if (tab === 'EVENTS') {
-       const { data } = await supabase.from('events').select('*').order('date', { ascending: false });
-       if (data) setEvents(data as any);
+    try {
+      if (tab === 'USERS') {
+        const { data } = await supabase.from('profiles').select('*');
+        if (data) setUsers(data as any);
+      } else if (tab === 'DOCUMENTS') {
+         const { data } = await supabase.from('user_documents').select('*').order('created_at', { ascending: false });
+         if (data) setDocs(data as any);
+      } else if (tab === 'ANNOUNCEMENTS') {
+         const { data, error } = await supabase.from('announcements').select('*').order('date', { ascending: false });
+         if(error) throw error;
+         // Map image_url (db) to imageUrl (frontend)
+         if (data) setAnnouncements(data.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date})));
+      } else if (tab === 'EVENTS') {
+         const { data, error } = await supabase.from('events').select('*').order('date', { ascending: false });
+         if(error) throw error;
+         if (data) setEvents(data.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date})));
+      }
+    } catch (error: any) {
+       console.error("Fetch Error:", error);
+       alert("Eroare la încărcarea datelor (verificați consola): " + error.message);
     }
   };
 
@@ -303,14 +312,15 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
   };
 
   const saveItem = async (table: string, data: any) => {
+     setSaving(true);
      try {
        // Ensure end_date is saved. Ensure unified description.
        const payload = {
           title: data.title,
-          description: data.description || data.short_description || '', // Unify
-          image_url: data.image_url,
+          description: data.description, 
+          image_url: data.image_url || data.imageUrl, // Handle both cases
           date: data.date,
-          end_date: data.end_date || null,
+          end_date: data.end_date || data.endDate || null,
           active: data.active !== false
        };
 
@@ -319,15 +329,20 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
        }
 
        if (data.id) {
-          await supabase.from(table).update(payload).eq('id', data.id);
+          const { error } = await supabase.from(table).update(payload).eq('id', data.id);
+          if (error) throw error;
        } else {
-          await supabase.from(table).insert(payload);
+          const { error } = await supabase.from(table).insert(payload);
+          if (error) throw error;
        }
        setIsEditModalOpen(false);
        setIsPreviewMode(false);
        fetchData();
      } catch(e:any) {
         alert('Eroare salvare: ' + e.message);
+        console.error(e);
+     } finally {
+        setSaving(false);
      }
   };
 
@@ -345,7 +360,8 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
 
       const { data: { publicUrl } } = supabase.storage.from('content_images').getPublicUrl(filePath);
       
-      setEditingItem({ ...editingItem, image_url: publicUrl });
+      // Update both properties to be safe
+      setEditingItem({ ...editingItem, image_url: publicUrl, imageUrl: publicUrl });
     } catch (error: any) {
       alert('Eroare upload: ' + error.message);
     } finally {
@@ -358,6 +374,7 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
      if(!editingItem) return null;
      
      const isEvent = tab === 'EVENTS';
+     const img = editingItem.image_url || editingItem.imageUrl;
      
      return (
         <div className="space-y-4">
@@ -367,16 +384,16 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
 
            {/* Card Preview */}
            <div className="border rounded-lg overflow-hidden shadow-sm bg-white">
-               {editingItem.image_url && (
+               {img && (
                    <div className="h-48 w-full bg-black flex items-center justify-center">
-                       <img src={editingItem.image_url} className="h-full object-contain" alt="Preview"/>
+                       <img src={img} className="h-full object-contain" alt="Preview"/>
                    </div>
                )}
                <div className="p-4">
                   <h2 className="text-xl font-bold text-ro-blue mb-2">{editingItem.title}</h2>
                   <div className="text-sm text-ro-red font-semibold mb-2">
                      {isEvent && <>{editingItem.location} • </>}
-                     {editingItem.date} {editingItem.end_date ? ` - ${editingItem.end_date}` : ''}
+                     {editingItem.date} {editingItem.end_date || editingItem.endDate ? ` - ${editingItem.end_date || editingItem.endDate}` : ''}
                   </div>
                   <p className="text-gray-700 whitespace-pre-line">{editingItem.description}</p>
                </div>
@@ -384,7 +401,9 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
 
            <div className="flex gap-2 pt-4 border-t">
               <Button variant="ghost" onClick={() => setIsPreviewMode(false)}><ArrowLeft className="w-4 h-4 mr-2"/> Înapoi la Editare</Button>
-              <Button fullWidth onClick={() => saveItem(tab === 'ANNOUNCEMENTS' ? 'announcements' : 'events', editingItem)}>Confirmă și Salvează</Button>
+              <Button fullWidth onClick={() => saveItem(tab === 'ANNOUNCEMENTS' ? 'announcements' : 'events', editingItem)} disabled={saving}>
+                 {saving ? 'Se salvează...' : 'Confirmă și Salvează'}
+              </Button>
            </div>
         </div>
      );
@@ -431,8 +450,8 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
                   <input 
                     type="date"
                     className="w-full p-2 border rounded" 
-                    value={editingItem?.end_date || ''} 
-                    onChange={e => setEditingItem({...editingItem, end_date: e.target.value})} 
+                    value={editingItem?.end_date || editingItem?.endDate || ''} 
+                    onChange={e => setEditingItem({...editingItem, end_date: e.target.value, endDate: e.target.value})} 
                   />
                </div>
             </div>
@@ -444,8 +463,8 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
                   <span className="text-sm text-ro-blue font-bold">{uploadingImage ? 'Se încarcă...' : 'Încarcă Imagine (jpg, png)'}</span>
                   <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploadingImage} />
                </label>
-               {editingItem?.image_url && (
-                  <div className="mt-2 text-xs text-green-600 truncate">{editingItem.image_url}</div>
+               {(editingItem?.image_url || editingItem?.imageUrl) && (
+                  <div className="mt-2 text-xs text-green-600 truncate">Imagine atașată</div>
                )}
             </div>
             
@@ -535,7 +554,7 @@ const AdminScreen = ({ user, onClose }: { user: UserProfile, onClose: () => void
                           <img src={item.image_url || item.imageUrl} className="w-12 h-12 object-cover rounded bg-gray-200" alt=""/>
                           <div>
                              <div className="font-bold text-sm">{item.title}</div>
-                             <div className="text-xs text-gray-500">{item.date} {item.end_date ? `- ${item.end_date}` : ''} • {item.active ? 'Activ' : 'Inactiv'}</div>
+                             <div className="text-xs text-gray-500">{item.date} {item.end_date || item.endDate ? `- ${item.end_date || item.endDate}` : ''} • {item.active ? 'Activ' : 'Inactiv'}</div>
                           </div>
                        </div>
                        <div className="flex gap-2">
