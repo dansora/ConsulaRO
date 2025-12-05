@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Home, Book, Send, HelpCircle, Settings, User, 
   LogOut, Camera, Bell, Calendar,
-  ChevronRight, Search, Shield, Trash2, Plus, Edit, Eye, ArrowLeft, Upload, X, Globe as GlobeIcon, FileText, Save, AlertTriangle, Database
+  ChevronRight, Search, Shield, Trash2, Plus, Edit, Eye, ArrowLeft, Upload, X, Globe as GlobeIcon, FileText, Save, AlertTriangle, Database,
+  Sun, Moon, Monitor, Type
 } from 'lucide-react';
 import { 
   LanguageCode, UserProfile, AppTheme, TextSize, ViewState, 
@@ -486,10 +488,37 @@ const SettingsScreen = ({ textSize, setTextSize, theme, setTheme, setView, notif
   return ( 
       <div className="p-4 space-y-6">
           <h2 className="text-2xl font-bold text-ro-blue mb-4">{t('settings_title')}</h2>
+          
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Bell className="w-4 h-4" /> Notificări</h3>
+              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Bell className="w-4 h-4" /> {t('settings_notifications')}</h3>
               <label className="flex items-center justify-between"><span className="text-gray-700">Activează</span><input type="checkbox" checked={notifications.enabled} onChange={e => setNotifications({...notifications, enabled: e.target.checked})} /></label>
           </div>
+
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Type className="w-4 h-4" /> {t('settings_text_size')}</h3>
+              <div className="flex gap-2">
+                  <button onClick={() => setTextSize(TextSize.SMALL)} className={`px-3 py-1 rounded border ${textSize === TextSize.SMALL ? 'bg-ro-blue text-white' : 'bg-gray-50'}`}>S</button>
+                  <button onClick={() => setTextSize(TextSize.MEDIUM)} className={`px-3 py-1 rounded border ${textSize === TextSize.MEDIUM ? 'bg-ro-blue text-white' : 'bg-gray-50'}`}>M</button>
+                  <button onClick={() => setTextSize(TextSize.LARGE)} className={`px-3 py-1 rounded border ${textSize === TextSize.LARGE ? 'bg-ro-blue text-white' : 'bg-gray-50'}`}>L</button>
+                  <button onClick={() => setTextSize(TextSize.XLARGE)} className={`px-3 py-1 rounded border ${textSize === TextSize.XLARGE ? 'bg-ro-blue text-white' : 'bg-gray-50'}`}>XL</button>
+              </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Monitor className="w-4 h-4" /> {t('settings_theme')}</h3>
+              <div className="flex gap-2">
+                  <button onClick={() => setTheme(AppTheme.LIGHT)} className={`flex-1 py-2 rounded border flex items-center justify-center gap-1 ${theme === AppTheme.LIGHT ? 'bg-ro-blue text-white' : 'bg-gray-50'}`}><Sun className="w-4 h-4"/> Light</button>
+                  <button onClick={() => setTheme(AppTheme.DARK)} className={`flex-1 py-2 rounded border flex items-center justify-center gap-1 ${theme === AppTheme.DARK ? 'bg-ro-blue text-white' : 'bg-gray-50'}`}><Moon className="w-4 h-4"/> Dark</button>
+                  <button onClick={() => setTheme(AppTheme.AUTO)} className={`flex-1 py-2 rounded border flex items-center justify-center gap-1 ${theme === AppTheme.AUTO ? 'bg-ro-blue text-white' : 'bg-gray-50'}`}><Monitor className="w-4 h-4"/> Auto</button>
+              </div>
+          </div>
+
+          <div className="space-y-2">
+             <Button variant="ghost" fullWidth onClick={() => alert("Pagina Termeni în construcție.")} className="justify-start bg-white border border-gray-100">{t('settings_terms')}</Button>
+             <Button variant="ghost" fullWidth onClick={() => alert("Pagina Politici în construcție.")} className="justify-start bg-white border border-gray-100">{t('settings_privacy')}</Button>
+             <Button variant="ghost" fullWidth onClick={() => alert("Email: contact@consularo.app")} className="justify-start bg-white border border-gray-100">{t('settings_contact')}</Button>
+          </div>
+
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
               <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Database className="w-4 h-4" /> Mentenanță</h3>
               <Button variant="secondary" fullWidth onClick={onShowSql} className="flex items-center justify-center gap-2"><Database className="w-4 h-4"/> {t('settings_sql')}</Button>
@@ -756,7 +785,24 @@ const App = () => {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+      
+      if (!data && !error) {
+        // Fallback: If auth succeeded but profile missing (trigger failed/delayed), create it now.
+        const { data: userData } = await supabase.auth.getUser();
+        if(userData.user) {
+             const newProfile = {
+                 id: userId,
+                 email: userData.user.email,
+                 first_name: userData.user.user_metadata?.first_name || '',
+                 last_name: userData.user.user_metadata?.last_name || '',
+                 role: 'user'
+             };
+             const { error: insertError } = await supabase.from('profiles').insert(newProfile);
+             if(!insertError) data = newProfile;
+        }
+      }
+
       if (data) {
          setUser({
             id: data.id,
@@ -773,9 +819,9 @@ const App = () => {
             avatarUrl: data.avatar_url || null,
             role: data.role || 'user'
          });
+         // If we are on Auth screen, move to Home
          if(view === 'AUTH' || view === 'SPLASH') setView('HOME');
       } else if (error) {
-         // Silently fail on profile fetch if not found (new user scenario handled by trigger or manual create), but log it.
          console.warn("Profile fetch warning:", error);
       }
   };
