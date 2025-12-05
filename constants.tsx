@@ -1,4 +1,4 @@
-import { Announcement, EventItem, FaqCategory, LanguageCode, ServiceCategory } from './types.ts';
+import { Announcement, EventItem, FaqCategory, LanguageCode, ServiceCategory } from './types';
 import { 
   FileText, Users, Flag, Globe, FileCheck, Mail, BookOpen, UserCheck, MoreHorizontal 
 } from 'lucide-react';

@@ -7,15 +7,15 @@ import {
 import { 
   LanguageCode, UserProfile, AppTheme, TextSize, ViewState, 
   Announcement, EventItem, NotificationPreferences, UserDocument
-} from './types.ts';
+} from './types';
 import { 
   LANGUAGES, FAQ_DATA, 
   SERVICE_CATEGORIES, APP_DESCRIPTION_SHORT, TRANSLATIONS
-} from './constants.ts';
-import { Modal } from './components/Modal.tsx';
-import { Button } from './components/Button.tsx';
-import { supabase } from './lib/supabaseClient.ts';
-import { SQL_SCHEMA } from './lib/schema.ts';
+} from './constants';
+import { Modal } from './components/Modal';
+import { Button } from './components/Button';
+import { supabase } from './lib/supabaseClient';
+import { SQL_SCHEMA } from './lib/schema';
 
 // --- Icon Map & Translation ---
 const IconMap: Record<string, any> = {
