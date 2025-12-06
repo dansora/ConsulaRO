@@ -3,7 +3,7 @@ import {
   Home, Book, Send, HelpCircle, Settings, User, 
   LogOut, Camera, Bell, Calendar,
   ChevronRight, Search, Shield, Trash2, Plus, Edit, Eye, ArrowLeft, Upload, X, Globe as GlobeIcon, FileText, Save, AlertTriangle, Database,
-  Sun, Moon, Monitor, Type, Info, Megaphone
+  Sun, Moon, Monitor, Type, Info, Megaphone, AlertCircle, CheckCircle
 } from 'lucide-react';
 import { 
   LanguageCode, UserProfile, AppTheme, TextSize, ViewState, 
@@ -105,7 +105,7 @@ const AutoScrollSection = ({ children, interval = 5000 }: { children?: React.Rea
         if (!container) return;
 
         const scrollNext = () => {
-            if (paused) return;
+            if (paused || !container) return;
             // Assumes child cards are at least 300px + gap. Scrolls by approximately one card width
             const cardWidth = 316; // 300px min-width + 16px gap
             const maxScroll = container.scrollWidth - container.clientWidth;
@@ -539,7 +539,7 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
   );
 
   return (
-    <div className="flex flex-col h-full bg-gray-100">
+    <div className="flex flex-col h-full bg-gray-100 pb-24">
       <div className="bg-gray-800 text-white p-4 flex justify-between items-center shadow-md">
           <h2 className="text-xl font-bold flex items-center gap-2"><Shield /> Admin</h2>
           <div className="flex items-center gap-2">
@@ -957,12 +957,15 @@ const App = () => {
                  last_name: userData.user.user_metadata?.last_name || '',
                  role: 'user'
              };
-             const { error: insertError } = await supabase.from('profiles').insert(newProfile);
+             // Use upsert to handle race conditions with trigger
+             const { error: insertError } = await supabase.from('profiles').upsert(newProfile);
+             
              if (!insertError) {
                  data = newProfile;
                  error = null; 
              } else {
-                 const { data: retryData } = await supabase.from('profiles').select('*').eq('id', userId).single();
+                 // Retry fetch one last time
+                 const { data: retryData } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
                  if (retryData) { data = retryData; error = null; }
              }
         }
@@ -1002,6 +1005,7 @@ const App = () => {
         });
         if (error) throw error;
         
+        // Handle "Confirm Email" scenario (common in Supabase)
         if (data.user && !data.session) {
              alert("Înregistrare reușită! Te rugăm să îți verifici emailul pentru a confirma contul înainte de autentificare.");
              setAuthMode('LOGIN');
@@ -1009,20 +1013,19 @@ const App = () => {
         }
 
         if (data.user) {
-            // Force create profile to prevent race conditions if auto-login happens
-            const newProfile = {
-                 id: data.user.id,
-                 email: data.user.email,
-                 first_name: firstName,
-                 last_name: lastName,
-                 role: 'user'
-            };
-            await supabase.from('profiles').upsert(newProfile);
-            alert('Cont creat! Autentificare automată...');
+            alert('Cont creat cu succes!');
+            // If session exists, fetchProfile will be triggered by onAuthStateChange
         }
       }
     } catch (e: any) {
-      handleError(e);
+      // Friendly error messages
+      if (e.message.includes("Invalid login credentials")) {
+          alert("Email sau parolă incorectă.");
+      } else if (e.message.includes("Email not confirmed")) {
+          alert("Adresa de email nu a fost confirmată. Verifică Inbox-ul.");
+      } else {
+          handleError(e);
+      }
     }
   };
 
@@ -1031,6 +1034,18 @@ const App = () => {
     setView('AUTH');
     setUser(null);
   };
+
+  const getAlertIcon = (type: string) => {
+     if (type === 'critical') return <AlertTriangle className="w-12 h-12 text-white" />;
+     if (type === 'warning') return <AlertCircle className="w-12 h-12 text-white" />;
+     return <Info className="w-12 h-12 text-white" />;
+  }
+
+  const getAlertColor = (type: string) => {
+    if (type === 'critical') return 'bg-ro-red';
+    if (type === 'warning') return 'bg-orange-500';
+    return 'bg-blue-500';
+  }
 
   if (view === 'SPLASH') {
     return <SplashScreen onFinish={() => {
@@ -1117,14 +1132,19 @@ const App = () => {
                 {activeAlerts.length > 0 && (
                     <section>
                          <h3 className="text-lg font-bold text-red-700 flex items-center gap-2 mb-3"><AlertTriangle className="w-5 h-5" /> {t('alerts_section')}</h3>
-                         <div className="space-y-3">
-                             {activeAlerts.map(alert => (
-                                 <div key={alert.id} className={`p-4 rounded-xl border-l-4 shadow-sm bg-white ${alert.type === 'critical' ? 'border-red-600 bg-red-50' : (alert.type === 'warning' ? 'border-orange-500 bg-orange-50' : 'border-blue-500 bg-blue-50')}`}>
-                                     <h4 className="font-bold text-gray-800">{alert.title}</h4>
-                                     <p className="text-sm text-gray-600 mt-1">{alert.message}</p>
-                                 </div>
-                             ))}
-                         </div>
+                         <AutoScrollSection interval={4000}>
+                            {activeAlerts.map(alert => (
+                                <div key={alert.id} className="snap-center min-w-[300px] bg-white rounded-xl shadow-md p-3 flex gap-3 border border-gray-100 cursor-pointer hover:shadow-lg transition-all">
+                                     <div className={`w-24 h-24 ${getAlertColor(alert.type)} rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center`}>
+                                         {getAlertIcon(alert.type)}
+                                     </div>
+                                     <div className="flex-1 flex flex-col justify-center">
+                                         <h4 className="font-bold text-gray-800 line-clamp-2 text-sm">{alert.title}</h4>
+                                         <p className="text-xs text-gray-600 mt-1 line-clamp-2">{alert.message}</p>
+                                     </div>
+                                </div>
+                            ))}
+                         </AutoScrollSection>
                     </section>
                 )}
 

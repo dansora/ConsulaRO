@@ -1,4 +1,5 @@
 
+
 export const SQL_SCHEMA = `-- SCRIPT COMPLET DE REPARARE SI INITIALIZARE
 -- Ruleaza acest script in Supabase SQL Editor
 
@@ -111,7 +112,28 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('profile_images', 'profil
 INSERT INTO storage.buckets (id, name, public) VALUES ('content_images', 'content_images', true) ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('documents', 'documents', false) ON CONFLICT (id) DO NOTHING;
 
--- 10. Policies (RLS)
+-- 10. TRIGGER PENTRU CREARE AUTOMATA PROFIL (Fix pentru Inregistrare)
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, first_name, last_name, role)
+  VALUES (
+    new.id,
+    new.email,
+    new.raw_user_meta_data->>'first_name',
+    new.raw_user_meta_data->>'last_name',
+    'user'
+  );
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- 11. Policies (RLS)
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public profiles" ON profiles;
 CREATE POLICY "Public profiles" ON profiles FOR SELECT USING (true);
