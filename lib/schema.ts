@@ -1,29 +1,24 @@
 
 export const SQL_SCHEMA = `-- SCRIPT COMPLET DE REPARARE SI INITIALIZARE
--- Ruleaza acest script in Supabase SQL Editor pentru a repara erorile 400, 42703, 23502, 42710
+-- Ruleaza acest script in Supabase SQL Editor
 
 -- 1. REPARARE EROARE 23502 (null value in column "content")
--- Facem coloana veche 'content' optionala si ne asiguram ca avem 'description'
 DO $$
 BEGIN
     IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'announcements' AND column_name = 'content') THEN
         ALTER TABLE announcements ALTER COLUMN content DROP NOT NULL;
     END IF;
-    
-    -- Daca avem date in content dar nu in description, le mutam
     IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'announcements' AND column_name = 'content') THEN
        UPDATE announcements SET description = content WHERE description IS NULL;
     END IF;
 END $$;
 
 -- 2. REPARARE EROARE 42703 (column "active" does not exist)
--- Redenumim is_active in active daca exista varianta veche
 DO $$
 BEGIN
     IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'announcements' AND column_name = 'is_active') THEN
         ALTER TABLE announcements RENAME COLUMN is_active TO active;
     END IF;
-
     IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'events' AND column_name = 'is_active') THEN
         ALTER TABLE events RENAME COLUMN is_active TO active;
     END IF;
@@ -49,14 +44,12 @@ CREATE TABLE IF NOT EXISTS profiles (
   role TEXT DEFAULT 'user',
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
--- Asiguram ca toate coloanele exista (in caz ca tabelul exista deja)
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS county TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS post_code TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS username TEXT;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS image TEXT; -- Legacy support
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS image TEXT;
 
 -- 5. Create/Update Announcements Table
 CREATE TABLE IF NOT EXISTS announcements (
@@ -102,12 +95,23 @@ CREATE TABLE IF NOT EXISTS user_documents (
 );
 ALTER TABLE user_documents ADD COLUMN IF NOT EXISTS message TEXT;
 
--- 8. Storage Buckets
+-- 8. Create Alerts Table (NEW)
+CREATE TABLE IF NOT EXISTS alerts (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  title TEXT NOT NULL,
+  message TEXT,
+  type TEXT DEFAULT 'info',
+  country TEXT,
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 9. Storage Buckets
 INSERT INTO storage.buckets (id, name, public) VALUES ('profile_images', 'profile_images', true) ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('content_images', 'content_images', true) ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('documents', 'documents', false) ON CONFLICT (id) DO NOTHING;
 
--- 9. Policies (RLS) - Drop first to ensure update
+-- 10. Policies (RLS)
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public profiles" ON profiles;
 CREATE POLICY "Public profiles" ON profiles FOR SELECT USING (true);
@@ -146,7 +150,13 @@ CREATE POLICY "Admins all docs" ON user_documents FOR SELECT USING (EXISTS (SELE
 DROP POLICY IF EXISTS "Users insert docs" ON user_documents;
 CREATE POLICY "Users insert docs" ON user_documents FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Storage Policies (Drop first to avoid 42710 error)
+ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public alerts" ON alerts;
+CREATE POLICY "Public alerts" ON alerts FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admin manage alerts" ON alerts;
+CREATE POLICY "Admin manage alerts" ON alerts FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'super_admin')));
+
+-- Storage Policies
 DROP POLICY IF EXISTS "Public Profiles" ON storage.objects;
 CREATE POLICY "Public Profiles" ON storage.objects FOR SELECT USING (bucket_id = 'profile_images');
 DROP POLICY IF EXISTS "Auth Upload Profiles" ON storage.objects;

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Home, Book, Send, HelpCircle, Settings, User, 
@@ -8,7 +7,7 @@ import {
 } from 'lucide-react';
 import { 
   LanguageCode, UserProfile, AppTheme, TextSize, ViewState, 
-  Announcement, EventItem, NotificationPreferences, UserDocument
+  Announcement, EventItem, NotificationPreferences, UserDocument, AlertItem
 } from './types';
 import { 
   LANGUAGES, FAQ_DATA, 
@@ -96,6 +95,46 @@ const ErrorDisplayModal = ({ error, isOpen, onClose, onShowSql, t }: any) => {
   );
 };
 
+// AUTO SCROLL CAROUSEL COMPONENT
+const AutoScrollSection = ({ children, interval = 5000 }: { children?: React.ReactNode, interval?: number }) => {
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const [paused, setPaused] = useState(false);
+
+    useEffect(() => {
+        const container = scrollRef.current;
+        if (!container) return;
+
+        const scrollNext = () => {
+            if (paused) return;
+            // Assumes child cards are at least 300px + gap. Scrolls by approximately one card width
+            const cardWidth = 316; // 300px min-width + 16px gap
+            const maxScroll = container.scrollWidth - container.clientWidth;
+            
+            if (container.scrollLeft >= maxScroll - 10) {
+                container.scrollTo({ left: 0, behavior: 'smooth' });
+            } else {
+                container.scrollBy({ left: cardWidth, behavior: 'smooth' });
+            }
+        };
+
+        const timer = setInterval(scrollNext, interval);
+        return () => clearInterval(timer);
+    }, [paused, interval]);
+
+    return (
+        <div 
+            ref={scrollRef} 
+            className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x"
+            onTouchStart={() => setPaused(true)}
+            onTouchEnd={() => setPaused(false)}
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
+        >
+            {children}
+        </div>
+    );
+};
+
 const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
   const [bgClass, setBgClass] = useState('bg-ro-blue');
   useEffect(() => {
@@ -151,7 +190,7 @@ const Header = ({ currentLang, setLang, onProfileClick, onSettingsClick, onSearc
 };
 
 const BottomNav = ({ currentView, setView, t }: any) => {
-  if (currentView === 'ADMIN' || currentView === 'SEND_DOCS') return null;
+  // Navigation now persistent for all screens
   const navItems = [
     { view: 'HOME', icon: Home, label: t('nav_home') },
     { view: 'SERVICES', icon: Book, label: t('nav_services') },
@@ -212,11 +251,12 @@ const DetailModal = ({ isOpen, onClose, title, imageUrl, children }: any) => {
 
 // --- ADMIN SCREEN ---
 const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
-  const [tab, setTab] = useState<'USERS' | 'ANNOUNCEMENTS' | 'EVENTS' | 'DOCUMENTS'>('USERS');
+  const [tab, setTab] = useState<'USERS' | 'ANNOUNCEMENTS' | 'EVENTS' | 'DOCUMENTS' | 'ALERTS'>('USERS');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [docs, setDocs] = useState<UserDocument[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
   
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -268,6 +308,10 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
              endDate: i.end_date, 
              active: i.active
          })));
+      } else if (tab === 'ALERTS') {
+         const { data, error } = await supabase.from('alerts').select('*').order('created_at', { ascending: false });
+         if(error) throw error;
+         if (data) setAlerts(data);
       }
     } catch (error: any) {
        console.error("Fetch Error:", error);
@@ -296,17 +340,25 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
      try {
        const cleanDate = (d: string) => (d && d.trim() !== '' ? d : null);
 
-       const payload = {
-          title: data.title,
-          description: data.description || '',
-          image_url: data.image_url || data.imageUrl,
-          date: cleanDate(data.date),
-          end_date: cleanDate(data.end_date || data.endDate),
-          active: data.active !== false
-       };
-
+       const payload: any = { active: data.active !== false };
+       
+       if (table === 'announcements' || table === 'events') {
+          payload.title = data.title;
+          payload.description = data.description || '';
+          payload.image_url = data.image_url || data.imageUrl;
+          payload.date = cleanDate(data.date);
+          payload.end_date = cleanDate(data.end_date || data.endDate);
+       }
+       
        if(table === 'events') {
-          (payload as any).location = data.location;
+          payload.location = data.location;
+       }
+
+       if (table === 'alerts') {
+          payload.title = data.title;
+          payload.message = data.message;
+          payload.type = data.type || 'info';
+          payload.country = data.country || null;
        }
 
        let error;
@@ -389,6 +441,16 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
 
   const renderPreview = () => {
      if(!editingItem) return null;
+     if (tab === 'ALERTS') {
+        return (
+            <div className={`p-4 rounded-lg border-l-4 shadow mb-4 bg-red-50 border-red-500`}>
+                <h3 className="font-bold text-red-800">{editingItem.title}</h3>
+                <p className="text-sm text-red-700">{editingItem.message}</p>
+                <div className="text-xs mt-2 text-gray-500">Target: {editingItem.country || 'Global'}</div>
+                <div className="flex gap-2 pt-4 border-t mt-2"><Button variant="ghost" onClick={() => setIsPreviewMode(false)}><ArrowLeft className="w-4 h-4 mr-2"/> Editare</Button><Button fullWidth onClick={() => saveItem('alerts', editingItem)} disabled={saving}>{saving ? '...' : 'Salvează'}</Button></div>
+            </div>
+        )
+     }
      const isEvent = tab === 'EVENTS';
      const img = editingItem.image_url || editingItem.imageUrl;
      return (
@@ -403,7 +465,32 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
      );
   };
 
-  const renderEditForm = () => (
+  const renderEditForm = () => {
+      if (tab === 'ALERTS') {
+          return (
+              <div className="space-y-3">
+                  <input className="w-full p-2 border rounded" placeholder="Titlu Alertă" value={editingItem?.title || ''} onChange={e => setEditingItem({...editingItem, title: e.target.value})} />
+                  <textarea className="w-full p-2 border rounded h-24" placeholder="Mesaj Alertă" value={editingItem?.message || ''} onChange={e => setEditingItem({...editingItem, message: e.target.value})} />
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                        <label className="text-xs text-gray-500">Tip</label>
+                        <select className="w-full p-2 border rounded" value={editingItem?.type || 'info'} onChange={e => setEditingItem({...editingItem, type: e.target.value})}>
+                            <option value="info">Info</option>
+                            <option value="warning">Warning</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                    <div className="flex-1">
+                        <label className="text-xs text-gray-500">Țară Țintă (Ex: RO, IT) - Gol pt Global</label>
+                        <input className="w-full p-2 border rounded" placeholder="Cod Țară" value={editingItem?.country || ''} onChange={e => setEditingItem({...editingItem, country: e.target.value})} />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={editingItem?.active !== false} onChange={e => setEditingItem({...editingItem, active: e.target.checked})} /><span className="text-sm">Activ</span></label>
+                  <Button fullWidth onClick={() => setIsPreviewMode(true)} disabled={!editingItem?.title}>Previzualizare</Button>
+              </div>
+          )
+      }
+      return (
        <div className="space-y-3">
             <input className="w-full p-2 border rounded" placeholder="Titlu" value={editingItem?.title || ''} onChange={e => setEditingItem({...editingItem, title: e.target.value})} />
             <textarea className="w-full p-2 border rounded h-40" placeholder="Descriere" value={editingItem?.description || ''} onChange={e => setEditingItem({...editingItem, description: e.target.value})} />
@@ -419,7 +506,8 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
             <label className="flex items-center gap-2"><input type="checkbox" checked={editingItem?.active !== false} onChange={e => setEditingItem({...editingItem, active: e.target.checked})} /><span className="text-sm">Activ</span></label>
             <Button fullWidth onClick={() => setIsPreviewMode(true)} disabled={!editingItem?.title || uploadingImage}><Eye className="w-4 h-4 mr-2"/> Previzualizare</Button>
        </div>
-  );
+    );
+  };
 
   const renderDocModal = () => (
       <div className="space-y-4">
@@ -461,7 +549,7 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
              <button onClick={onClose} className="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600">Ieșire</button>
           </div>
       </div>
-      <div className="flex bg-white shadow-sm overflow-x-auto">{['USERS', 'ANNOUNCEMENTS', 'EVENTS', 'DOCUMENTS'].map(t => (<button key={t} onClick={() => setTab(t as any)} className={`px-4 py-3 font-bold text-sm whitespace-nowrap ${tab === t ? 'text-ro-blue border-b-2 border-ro-blue bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}>{t}</button>))}</div>
+      <div className="flex bg-white shadow-sm overflow-x-auto">{['USERS', 'ALERTS', 'ANNOUNCEMENTS', 'EVENTS', 'DOCUMENTS'].map(t => (<button key={t} onClick={() => setTab(t as any)} className={`px-4 py-3 font-bold text-sm whitespace-nowrap ${tab === t ? 'text-ro-blue border-b-2 border-ro-blue bg-blue-50' : 'text-gray-500 hover:bg-gray-50'}`}>{t}</button>))}</div>
       <div className="flex-1 overflow-y-auto p-4">
         {tab === 'USERS' && (<div className="grid grid-cols-1 md:grid-cols-2 gap-4">{users.map(u => (
             <div key={u.id} className="bg-white rounded-lg shadow p-3 flex gap-3 border">
@@ -490,8 +578,8 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
                 </div>
             </div>
         ))}</div>)}
-        {(tab === 'ANNOUNCEMENTS' || tab === 'EVENTS') && (
-           <div><div className="flex justify-between mb-4"><Button onClick={() => { setEditingItem({active: true}); setIsPreviewMode(false); setIsEditModalOpen(true); }}><Plus className="w-4 h-4 mr-1 inline"/> Adaugă</Button></div><div className="space-y-3">{(tab === 'ANNOUNCEMENTS' ? announcements : events).map((item: any) => (<div key={item.id} className="bg-white p-3 rounded-lg shadow border flex justify-between items-center"><div className="flex items-center gap-3"><img src={item.image_url || item.imageUrl} className="w-12 h-12 object-cover rounded" alt=""/><div className="font-bold text-sm">{item.title}</div></div><div className="flex gap-2"><button onClick={() => { setEditingItem(item); setIsPreviewMode(false); setIsEditModalOpen(true); }} className="p-2 bg-blue-50 text-blue-600 rounded"><Edit className="w-4 h-4"/></button><button onClick={() => deleteItem(tab === 'ANNOUNCEMENTS' ? 'announcements' : 'events', item.id)} className="p-2 bg-red-50 text-red-600 rounded"><Trash2 className="w-4 h-4"/></button></div></div>))}</div></div>
+        {(tab === 'ANNOUNCEMENTS' || tab === 'EVENTS' || tab === 'ALERTS') && (
+           <div><div className="flex justify-between mb-4"><Button onClick={() => { setEditingItem({active: true}); setIsPreviewMode(false); setIsEditModalOpen(true); }}><Plus className="w-4 h-4 mr-1 inline"/> Adaugă</Button></div><div className="space-y-3">{(tab === 'ANNOUNCEMENTS' ? announcements : (tab === 'EVENTS' ? events : alerts)).map((item: any) => (<div key={item.id} className="bg-white p-3 rounded-lg shadow border flex justify-between items-center"><div className="flex items-center gap-3">{tab !== 'ALERTS' && <img src={item.image_url || item.imageUrl} className="w-12 h-12 object-cover rounded" alt=""/>}<div className="font-bold text-sm">{item.title}</div></div><div className="flex gap-2"><button onClick={() => { setEditingItem(item); setIsPreviewMode(false); setIsEditModalOpen(true); }} className="p-2 bg-blue-50 text-blue-600 rounded"><Edit className="w-4 h-4"/></button><button onClick={() => deleteItem(tab === 'ANNOUNCEMENTS' ? 'announcements' : (tab === 'EVENTS' ? 'events' : 'alerts'), item.id)} className="p-2 bg-red-50 text-red-600 rounded"><Trash2 className="w-4 h-4"/></button></div></div>))}</div></div>
         )}
         {tab === 'DOCUMENTS' && (
             <div>
@@ -805,6 +893,7 @@ const App = () => {
   // Data State
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<Announcement | EventItem | null>(null);
 
   // Auth State
@@ -840,13 +929,14 @@ const App = () => {
 
   useEffect(() => {
      const fetchContent = async () => {
-        const { data: ann, error: annErr } = await supabase.from('announcements').select('*').eq('active', true).order('date', {ascending: false});
-        if(annErr) console.error("Announcements Fetch Error:", JSON.stringify(annErr, null, 2));
-        else if(ann) setAnnouncements(ann.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date, active: i.active})));
+        const { data: ann } = await supabase.from('announcements').select('*').eq('active', true).order('date', {ascending: false});
+        if(ann) setAnnouncements(ann.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date, active: i.active})));
         
-        const { data: ev, error: evErr } = await supabase.from('events').select('*').eq('active', true).order('date', {ascending: false});
-        if(evErr) console.error("Events Fetch Error:", JSON.stringify(evErr, null, 2));
-        else if(ev) setEvents(ev.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date, active: i.active})));
+        const { data: ev } = await supabase.from('events').select('*').eq('active', true).order('date', {ascending: false});
+        if(ev) setEvents(ev.map((i:any) => ({...i, imageUrl: i.image_url, endDate: i.end_date, active: i.active})));
+
+        const { data: al } = await supabase.from('alerts').select('*').eq('active', true);
+        if(al) setAlerts(al);
      };
      fetchContent();
   }, []);
@@ -895,8 +985,6 @@ const App = () => {
             role: data.role || 'user'
          });
          if(view === 'AUTH' || view === 'SPLASH') setView('HOME');
-      } else if (error) {
-         console.warn("Profile fetch warning:", error);
       }
   };
 
@@ -906,28 +994,31 @@ const App = () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
-        // Register Logic: Sign Up -> Create Profile Immediately
-        const { data: { user: newUser }, error } = await supabase.auth.signUp({ 
+        // Register Logic
+        const { data, error } = await supabase.auth.signUp({ 
             email, 
             password,
             options: { data: { first_name: firstName, last_name: lastName } }
         });
         if (error) throw error;
         
-        if (newUser) {
-            // Force create profile to prevent race conditions
+        if (data.user && !data.session) {
+             alert("Înregistrare reușită! Te rugăm să îți verifici emailul pentru a confirma contul înainte de autentificare.");
+             setAuthMode('LOGIN');
+             return;
+        }
+
+        if (data.user) {
+            // Force create profile to prevent race conditions if auto-login happens
             const newProfile = {
-                 id: newUser.id,
-                 email: newUser.email,
+                 id: data.user.id,
+                 email: data.user.email,
                  first_name: firstName,
                  last_name: lastName,
                  role: 'user'
             };
-            const { error: profileError } = await supabase.from('profiles').upsert(newProfile);
-            if(profileError) console.error("Profile creation error:", profileError);
-
-            alert('Cont creat! Verifică emailul sau intră în cont.');
-            setAuthMode('LOGIN');
+            await supabase.from('profiles').upsert(newProfile);
+            alert('Cont creat! Autentificare automată...');
         }
       }
     } catch (e: any) {
@@ -997,6 +1088,18 @@ const App = () => {
   // Helper icons for main render
   const MapPinIcon = ({className}:{className?:string}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
 
+  // Filter Alerts logic
+  const activeAlerts = alerts.filter(a => {
+      // Show if global (no country) or matches user country. 
+      // User country in profile is often full name (e.g. "România"), 
+      // Alert country is usually code ("RO"). This logic assumes admin types whatever matches.
+      // If user is visitor (no country), show only global.
+      if (!a.country) return true;
+      if (!user || !user.country) return false; 
+      // Simple includes check for flexibility
+      return user.country.toLowerCase().includes(a.country.toLowerCase()) || a.country.toLowerCase().includes(user.country.toLowerCase());
+  });
+
   const renderContent = () => {
     switch(view) {
        case 'HOME':
@@ -1011,12 +1114,26 @@ const App = () => {
                     </div>
                 </div>
 
+                {activeAlerts.length > 0 && (
+                    <section>
+                         <h3 className="text-lg font-bold text-red-700 flex items-center gap-2 mb-3"><AlertTriangle className="w-5 h-5" /> {t('alerts_section')}</h3>
+                         <div className="space-y-3">
+                             {activeAlerts.map(alert => (
+                                 <div key={alert.id} className={`p-4 rounded-xl border-l-4 shadow-sm bg-white ${alert.type === 'critical' ? 'border-red-600 bg-red-50' : (alert.type === 'warning' ? 'border-orange-500 bg-orange-50' : 'border-blue-500 bg-blue-50')}`}>
+                                     <h4 className="font-bold text-gray-800">{alert.title}</h4>
+                                     <p className="text-sm text-gray-600 mt-1">{alert.message}</p>
+                                 </div>
+                             ))}
+                         </div>
+                    </section>
+                )}
+
                 <section>
                    <div className="flex justify-between items-center mb-3">
                       <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Megaphone className="w-5 h-5 text-ro-red" /> {t('title_announcements')}</h3>
                       <button onClick={() => setView('ANNOUNCEMENTS_LIST')} className="text-sm text-ro-blue font-semibold">{t('view_all')}</button>
                    </div>
-                   <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x">
+                   <AutoScrollSection interval={5000}>
                       {announcements.length === 0 ? (
                          <div className="text-gray-400 text-sm italic w-full text-center py-4">Nu există anunțuri momentan.</div>
                       ) : (
@@ -1032,7 +1149,7 @@ const App = () => {
                            </div>
                         ))
                       )}
-                   </div>
+                   </AutoScrollSection>
                 </section>
 
                 <section>
@@ -1040,7 +1157,7 @@ const App = () => {
                       <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Calendar className="w-5 h-5 text-ro-yellow" /> {t('title_events')}</h3>
                       <button onClick={() => setView('EVENTS_LIST')} className="text-sm text-ro-blue font-semibold">{t('view_all')}</button>
                    </div>
-                   <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x">
+                   <AutoScrollSection interval={7000}>
                       {events.length === 0 ? (
                          <div className="text-gray-400 text-sm italic w-full text-center py-4">Nu există evenimente active.</div>
                       ) : (
@@ -1056,7 +1173,7 @@ const App = () => {
                            </div>
                         ))
                       )}
-                   </div>
+                   </AutoScrollSection>
                 </section>
              </div>
           );

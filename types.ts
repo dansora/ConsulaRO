@@ -44,6 +44,15 @@ export interface EventItem {
   active: boolean;
 }
 
+export interface AlertItem {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'critical';
+  country?: string | null;
+  active: boolean;
+}
+
 export interface UserDocument {
   id: string;
   user_id: string;
