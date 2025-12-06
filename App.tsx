@@ -47,7 +47,7 @@ const SqlFixModal = ({ isOpen, onClose, t }: { isOpen: boolean; onClose: () => v
       <div className="space-y-4">
         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
           <p className="text-sm text-yellow-700">
-            Dacă întâmpinați erori (ex: 400 Bad Request, lipsă coloane), copiați acest script și rulați-l în <strong>Supabase Dashboard &gt; SQL Editor</strong>.
+            Dacă întâmpinați erori (ex: contul nu se creează, erori 400), copiați acest script și rulați-l în <strong>Supabase Dashboard &gt; SQL Editor</strong>.
           </p>
         </div>
         <div className="relative">
@@ -108,7 +108,6 @@ const AutoScrollSection = ({ children, interval = 5000 }: { children?: React.Rea
 
         const scrollNext = () => {
             if (paused || !container) return;
-            // Assumes child cards are at least 300px + gap. Scrolls by approximately one card width
             const cardWidth = 316; // 300px min-width + 16px gap
             const maxScroll = container.scrollWidth - container.clientWidth;
             
@@ -192,7 +191,6 @@ const Header = ({ currentLang, setLang, onProfileClick, onSettingsClick, onSearc
 };
 
 const BottomNav = ({ currentView, setView, t }: any) => {
-  // Navigation persistent for all screens
   const navItems = [
     { view: 'HOME', icon: Home, label: t('nav_home') },
     { view: 'SERVICES', icon: Book, label: t('nav_services') },
@@ -265,14 +263,6 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  // Doc Upload Modal State
-  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
-  const [docFile, setDocFile] = useState<File | null>(null);
-  const [docPreview, setDocPreview] = useState<string | null>(null);
-  const [docMessage, setDocMessage] = useState('');
-  const [showDocCamera, setShowDocCamera] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => { fetchData(); }, [tab]);
 
@@ -401,46 +391,6 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
     }
   };
 
-  // Doc Upload Functions
-  const startDocCamera = async () => { setShowDocCamera(true); try { const stream = await navigator.mediaDevices.getUserMedia({ video: true }); if (videoRef.current) videoRef.current.srcObject = stream; } catch(e) { alert('Err Camera'); setShowDocCamera(false); } };
-  const takeDocPhoto = () => { if (videoRef.current) { const canvas = document.createElement('canvas'); canvas.width = videoRef.current.videoWidth; canvas.height = videoRef.current.videoHeight; canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0); canvas.toBlob(blob => { if(blob) { const f = new File([blob], "photo.jpg", { type: "image/jpeg" }); setDocFile(f); setDocPreview(URL.createObjectURL(blob)); } }); const stream = videoRef.current.srcObject as MediaStream; stream?.getTracks().forEach(t => t.stop()); setShowDocCamera(false); } };
-  const handleDocFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const f = e.target.files[0];
-            setDocFile(f);
-            if (f.type.startsWith('image/')) setDocPreview(URL.createObjectURL(f));
-            else setDocPreview(null);
-        }
-    };
-  const handleAdminDocUpload = async () => {
-        if (!docFile || !user) return;
-        setUploadingImage(true);
-        try {
-            const fileExt = docFile.name.split('.').pop();
-            const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-            const { error: uploadErr } = await supabase.storage.from('documents').upload(fileName, docFile);
-            if (uploadErr) throw uploadErr;
-            const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(fileName);
-            
-            const { error: dbErr } = await supabase.from('user_documents').insert({
-                user_id: user.id,
-                user_email: user.email,
-                user_name: `${user.firstName} ${user.lastName} (Admin)`,
-                file_name: docFile.name,
-                file_url: publicUrl,
-                file_type: docFile.type.startsWith('image/') ? 'image' : 'pdf',
-                message: docMessage
-            });
-            if (dbErr) throw dbErr;
-            alert('Document încărcat cu succes!');
-            setDocFile(null);
-            setDocPreview(null);
-            setDocMessage('');
-            setIsDocModalOpen(false);
-            fetchData();
-        } catch(e:any) { onError(e); } finally { setUploadingImage(false); }
-    };
-
   const renderPreview = () => {
      if(!editingItem) return null;
      if (tab === 'ALERTS') {
@@ -511,35 +461,6 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
     );
   };
 
-  const renderDocModal = () => (
-      <div className="space-y-4">
-          <div className="flex gap-2 justify-center">
-                <button onClick={() => document.getElementById('admin-doc-upload')?.click()} className="flex-1 py-3 bg-blue-50 text-ro-blue rounded-lg font-bold border border-blue-100 flex flex-col items-center gap-1 hover:bg-blue-100"><Upload className="w-6 h-6"/> Încarcă Fișier</button>
-                <button onClick={startDocCamera} className="flex-1 py-3 bg-blue-50 text-ro-blue rounded-lg font-bold border border-blue-100 flex flex-col items-center gap-1 hover:bg-blue-100"><Camera className="w-6 h-6"/> Fă Poză</button>
-                <input id="admin-doc-upload" type="file" className="hidden" accept="image/*,application/pdf" onChange={handleDocFileChange} />
-          </div>
-          {showDocCamera && (
-            <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
-                <video ref={videoRef} autoPlay className="w-full h-full object-cover" />
-                <button onClick={takeDocPhoto} className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-full p-4 shadow-lg border-4 border-gray-300"><div className="w-4 h-4 bg-red-600 rounded-full"></div></button>
-            </div>
-          )}
-          {docFile && (
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                <div className="flex items-center gap-2 mb-2">
-                    {docFile.type.startsWith('image/') ? <Eye className="w-4 h-4 text-gray-500"/> : <FileText className="w-4 h-4 text-gray-500"/>}
-                    <span className="text-sm font-medium truncate flex-1">{docFile.name}</span>
-                    <button onClick={() => { setDocFile(null); setDocPreview(null); }}><X className="w-4 h-4 text-red-500"/></button>
-                </div>
-                {docPreview && <img src={docPreview} className="w-full h-40 object-contain bg-white rounded border" alt="Preview"/>}
-                {!docPreview && docFile.type === 'application/pdf' && <div className="text-xs text-center p-4 text-gray-400">Previzualizare PDF indisponibilă</div>}
-            </div>
-          )}
-          <textarea className="w-full p-3 border rounded-lg h-24 text-sm" placeholder="Adaugă un mesaj..." value={docMessage} onChange={e => setDocMessage(e.target.value)} />
-          <Button fullWidth onClick={handleAdminDocUpload} disabled={!docFile || uploadingImage}>{uploadingImage ? 'Se încarcă...' : 'Trimite'}</Button>
-      </div>
-  );
-
   return (
     <div className="flex flex-col h-full bg-gray-100 pb-24">
       <div className="bg-gray-800 text-white p-4 flex justify-between items-center shadow-md">
@@ -585,8 +506,7 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
         )}
         {tab === 'DOCUMENTS' && (
             <div>
-                <div className="flex justify-end mb-4"><Button onClick={() => setIsDocModalOpen(true)}><Upload className="w-4 h-4 mr-1 inline"/> Încarcă Document</Button></div>
-                <div className="space-y-3">
+                 <div className="space-y-3">
                     {docs.map(doc => (
                         <div key={doc.id} className="bg-white rounded-lg shadow p-3 border text-sm">
                             <div className="flex justify-between font-bold mb-1"><span>{doc.user_name}</span><span className="text-gray-400 font-normal text-xs">{new Date(doc.created_at).toLocaleDateString()}</span></div>
@@ -602,7 +522,6 @@ const AdminScreen = ({ user, onClose, onError, onShowSql }: any) => {
         )}
       </div>
       <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title={isPreviewMode ? 'Previzualizare' : 'Editare'}>{isPreviewMode ? renderPreview() : renderEditForm()}</Modal>
-      <Modal isOpen={isDocModalOpen} onClose={() => setIsDocModalOpen(false)} title="Încarcă Document">{renderDocModal()}</Modal>
     </div>
   );
 };
@@ -946,12 +865,15 @@ const App = () => {
   }, []);
 
   const fetchProfile = async (userId: string) => {
+      // 1. Try normal fetch
       let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
       
+      // Ignore "no rows" error, we will handle it
       if (error && error.code === 'PGRST116') { error = null; data = null; }
       
       if (!data) {
-        // Fallback: If auth succeeded but profile missing (trigger failed/delayed), create it now.
+        console.warn("Profile missing, attempting fallback creation...");
+        // 2. Fallback: If auth succeeded but profile missing (trigger failed/delayed), create it manually.
         const { data: userData } = await supabase.auth.getUser();
         if(userData.user) {
              const newProfile = {
@@ -968,7 +890,8 @@ const App = () => {
                  data = newProfile;
                  error = null; 
              } else {
-                 // Retry fetch one last time
+                 console.error("Fallback creation failed:", insertError);
+                 // 3. Retry fetch one last time (maybe trigger finished now)
                  const { data: retryData } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
                  if (retryData) { data = retryData; error = null; }
              }
@@ -1009,7 +932,7 @@ const App = () => {
         });
         if (error) throw error;
         
-        // Handle "Confirm Email" scenario (common in Supabase)
+        // Handle "Confirm Email" scenario
         if (data.user && !data.session) {
              alert("Înregistrare reușită! Te rugăm să îți verifici emailul pentru a confirma contul înainte de autentificare.");
              setAuthMode('LOGIN');
@@ -1018,15 +941,17 @@ const App = () => {
 
         if (data.user) {
             alert('Cont creat cu succes!');
-            // If session exists, fetchProfile will be triggered by onAuthStateChange
+            // If we have a session, fetchProfile runs automatically. 
+            // If trigger fails, fetchProfile fallback handles it.
         }
       }
     } catch (e: any) {
-      // Friendly error messages
       if (e.message.includes("Invalid login credentials")) {
           alert("Email sau parolă incorectă.");
       } else if (e.message.includes("Email not confirmed")) {
           alert("Adresa de email nu a fost confirmată. Verifică Inbox-ul.");
+      } else if (e.message.includes("User already registered")) {
+          alert("Există deja un cont cu acest email.");
       } else {
           handleError(e);
       }
@@ -1109,13 +1034,8 @@ const App = () => {
 
   // Filter Alerts logic
   const activeAlerts = alerts.filter(a => {
-      // Show if global (no country) or matches user country. 
-      // User country in profile is often full name (e.g. "România"), 
-      // Alert country is usually code ("RO"). This logic assumes admin types whatever matches.
-      // If user is visitor (no country), show only global.
       if (!a.country) return true;
       if (!user || !user.country) return false; 
-      // Simple includes check for flexibility
       return user.country.toLowerCase().includes(a.country.toLowerCase()) || a.country.toLowerCase().includes(user.country.toLowerCase());
   });
 

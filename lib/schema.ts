@@ -1,5 +1,4 @@
 
-
 export const SQL_SCHEMA = `-- SCRIPT COMPLET DE REPARARE SI INITIALIZARE
 -- Ruleaza acest script in Supabase SQL Editor
 
@@ -9,9 +8,11 @@ BEGIN
     IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'announcements' AND column_name = 'content') THEN
         ALTER TABLE announcements ALTER COLUMN content DROP NOT NULL;
     END IF;
+    -- Migrare continut vechi daca exista
     IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'announcements' AND column_name = 'content') THEN
        UPDATE announcements SET description = content WHERE description IS NULL;
     END IF;
+    -- Redenumire coloane active
     IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'announcements' AND column_name = 'is_active') THEN
         ALTER TABLE announcements RENAME COLUMN is_active TO active;
     END IF;
@@ -41,7 +42,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Functie Trigger pentru creare automata profil
+-- Functie Trigger FOARTE IMPORTANTA pentru creare automata profil
+-- Foloseste SECURITY DEFINER pentru a rula cu drepturi de admin
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -53,7 +55,10 @@ BEGIN
     COALESCE(new.raw_user_meta_data->>'last_name', ''),
     'user'
   )
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    first_name = EXCLUDED.first_name,
+    last_name = EXCLUDED.last_name;
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -63,6 +68,9 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
 AFTER INSERT ON auth.users
 FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- Asigurare permisiuni pentru Trigger
+GRANT ALL ON public.profiles TO postgres, service_role;
 
 -- 4. ALERTS TABLE
 CREATE TABLE IF NOT EXISTS alerts (
@@ -121,12 +129,13 @@ ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_documents ENABLE ROW LEVEL SECURITY;
 
--- Profiles
+-- Resetare politici pentru a evita erorile de duplicare
 DROP POLICY IF EXISTS "Public profiles" ON profiles;
-CREATE POLICY "Public profiles" ON profiles FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Users update own" ON profiles;
-CREATE POLICY "Users update own" ON profiles FOR UPDATE USING (auth.uid() = id);
 DROP POLICY IF EXISTS "Users insert own" ON profiles;
+
+CREATE POLICY "Public profiles" ON profiles FOR SELECT USING (true);
+CREATE POLICY "Users update own" ON profiles FOR UPDATE USING (auth.uid() = id);
 CREATE POLICY "Users insert own" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- Alerts
@@ -152,11 +161,12 @@ CREATE POLICY "Users see own docs" ON user_documents FOR SELECT USING (auth.uid(
 DROP POLICY IF EXISTS "Users insert docs" ON user_documents;
 CREATE POLICY "Users insert docs" ON user_documents FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Storage Policies (Simplified)
+-- Storage Policies (Resetare)
 DROP POLICY IF EXISTS "Public View" ON storage.objects;
-CREATE POLICY "Public View" ON storage.objects FOR SELECT USING (bucket_id IN ('profile_images', 'content_images', 'documents'));
 DROP POLICY IF EXISTS "Auth Upload" ON storage.objects;
-CREATE POLICY "Auth Upload" ON storage.objects FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 DROP POLICY IF EXISTS "Auth Update" ON storage.objects;
+
+CREATE POLICY "Public View" ON storage.objects FOR SELECT USING (bucket_id IN ('profile_images', 'content_images', 'documents'));
+CREATE POLICY "Auth Upload" ON storage.objects FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "Auth Update" ON storage.objects FOR UPDATE USING (auth.role() = 'authenticated');
 `;
