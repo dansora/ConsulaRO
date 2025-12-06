@@ -24,7 +24,7 @@ END $$;
 -- 2. ENABLE UUID
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 3. PROFILES TABLE & TRIGGER (FIX INREGISTRARE)
+-- 3. PROFILES TABLE & TRIGGER (FIX INREGISTRARE + OAUTH)
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT,
@@ -42,23 +42,42 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Functie Trigger FOARTE IMPORTANTA pentru creare automata profil
--- Foloseste SECURITY DEFINER pentru a rula cu drepturi de admin
+-- Functie Trigger ACTUALIZATA pentru OAuth (Google/Facebook)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  extracted_first_name TEXT;
+  extracted_last_name TEXT;
+  full_name TEXT;
 BEGIN
-  INSERT INTO public.profiles (id, email, first_name, last_name, role)
+  -- Încercăm să luăm datele standard
+  extracted_first_name := new.raw_user_meta_data->>'first_name';
+  extracted_last_name := new.raw_user_meta_data->>'last_name';
+  full_name := new.raw_user_meta_data->>'full_name'; -- Google/FB trimit asta
+
+  -- Logică de extragere nume din full_name dacă first_name lipsește
+  IF extracted_first_name IS NULL OR extracted_first_name = '' THEN
+     IF full_name IS NOT NULL THEN
+        extracted_first_name := split_part(full_name, ' ', 1);
+        extracted_last_name := substring(full_name from position(' ' in full_name) + 1);
+     END IF;
+  END IF;
+
+  INSERT INTO public.profiles (id, email, first_name, last_name, avatar_url, role)
   VALUES (
     new.id,
     new.email,
-    COALESCE(new.raw_user_meta_data->>'first_name', ''),
-    COALESCE(new.raw_user_meta_data->>'last_name', ''),
+    COALESCE(extracted_first_name, ''),
+    COALESCE(extracted_last_name, ''),
+    new.raw_user_meta_data->>'avatar_url', -- Google/FB trimit avatar aici
     'user'
   )
   ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
     first_name = EXCLUDED.first_name,
-    last_name = EXCLUDED.last_name;
+    last_name = EXCLUDED.last_name,
+    avatar_url = COALESCE(EXCLUDED.avatar_url, profiles.avatar_url);
+    
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
