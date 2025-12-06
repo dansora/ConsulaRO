@@ -3,7 +3,7 @@
 export const SQL_SCHEMA = `-- SCRIPT COMPLET DE REPARARE SI INITIALIZARE
 -- Ruleaza acest script in Supabase SQL Editor
 
--- 1. REPARARE EROARE 23502 (null value in column "content")
+-- 1. REPARARE STRUCTURA (Daca e cazul)
 DO $$
 BEGIN
     IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'announcements' AND column_name = 'content') THEN
@@ -12,11 +12,6 @@ BEGIN
     IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'announcements' AND column_name = 'content') THEN
        UPDATE announcements SET description = content WHERE description IS NULL;
     END IF;
-END $$;
-
--- 2. REPARARE EROARE 42703 (column "active" does not exist)
-DO $$
-BEGIN
     IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'announcements' AND column_name = 'is_active') THEN
         ALTER TABLE announcements RENAME COLUMN is_active TO active;
     END IF;
@@ -25,10 +20,10 @@ BEGIN
     END IF;
 END $$;
 
--- 3. Enable UUID extension
+-- 2. ENABLE UUID
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 4. Create/Update Profiles Table
+-- 3. PROFILES TABLE & TRIGGER (FIX INREGISTRARE)
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT,
@@ -45,14 +40,42 @@ CREATE TABLE IF NOT EXISTS profiles (
   role TEXT DEFAULT 'user',
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS county TEXT;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS post_code TEXT;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS username TEXT;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS image TEXT;
 
--- 5. Create/Update Announcements Table
+-- Functie Trigger pentru creare automata profil
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, first_name, last_name, role)
+  VALUES (
+    new.id,
+    new.email,
+    COALESCE(new.raw_user_meta_data->>'first_name', ''),
+    COALESCE(new.raw_user_meta_data->>'last_name', ''),
+    'user'
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Stergere trigger vechi si recreare
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- 4. ALERTS TABLE
+CREATE TABLE IF NOT EXISTS alerts (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  title TEXT NOT NULL,
+  message TEXT,
+  type TEXT DEFAULT 'info', -- info, warning, critical
+  country TEXT, -- null pt global
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 5. CONTENT TABLES
 CREATE TABLE IF NOT EXISTS announcements (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   title TEXT NOT NULL,
@@ -60,32 +83,23 @@ CREATE TABLE IF NOT EXISTS announcements (
   image_url TEXT,
   date DATE,
   end_date DATE,
-  active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  active BOOLEAN DEFAULT true
 );
-ALTER TABLE announcements ADD COLUMN IF NOT EXISTS end_date DATE;
-ALTER TABLE announcements ADD COLUMN IF NOT EXISTS description TEXT;
-ALTER TABLE announcements ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT true;
 
--- 6. Create/Update Events Table
 CREATE TABLE IF NOT EXISTS events (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   title TEXT NOT NULL,
-  location TEXT,
   description TEXT,
+  location TEXT,
   image_url TEXT,
   date DATE,
   end_date DATE,
-  active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  active BOOLEAN DEFAULT true
 );
-ALTER TABLE events ADD COLUMN IF NOT EXISTS end_date DATE;
-ALTER TABLE events ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT true;
 
--- 7. Create User Documents Table
 CREATE TABLE IF NOT EXISTS user_documents (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id),
+  user_id UUID REFERENCES profiles(id),
   user_email TEXT,
   user_name TEXT,
   file_name TEXT,
@@ -94,105 +108,55 @@ CREATE TABLE IF NOT EXISTS user_documents (
   message TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-ALTER TABLE user_documents ADD COLUMN IF NOT EXISTS message TEXT;
 
--- 8. Create Alerts Table (NEW)
-CREATE TABLE IF NOT EXISTS alerts (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  title TEXT NOT NULL,
-  message TEXT,
-  type TEXT DEFAULT 'info',
-  country TEXT,
-  active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 9. Storage Buckets
+-- 6. STORAGE BUCKETS
 INSERT INTO storage.buckets (id, name, public) VALUES ('profile_images', 'profile_images', true) ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('content_images', 'content_images', true) ON CONFLICT (id) DO NOTHING;
-INSERT INTO storage.buckets (id, name, public) VALUES ('documents', 'documents', false) ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('documents', 'documents', true) ON CONFLICT (id) DO NOTHING;
 
--- 10. TRIGGER PENTRU CREARE AUTOMATA PROFIL (Fix pentru Inregistrare)
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email, first_name, last_name, role)
-  VALUES (
-    new.id,
-    new.email,
-    new.raw_user_meta_data->>'first_name',
-    new.raw_user_meta_data->>'last_name',
-    'user'
-  );
-  RETURN new;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-AFTER INSERT ON auth.users
-FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
-
--- 11. Policies (RLS)
+-- 7. POLICIES (RLS)
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_documents ENABLE ROW LEVEL SECURITY;
+
+-- Profiles
 DROP POLICY IF EXISTS "Public profiles" ON profiles;
 CREATE POLICY "Public profiles" ON profiles FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Self insert profiles" ON profiles;
-CREATE POLICY "Self insert profiles" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
-DROP POLICY IF EXISTS "Self update profiles" ON profiles;
-CREATE POLICY "Self update profiles" ON profiles FOR UPDATE USING (auth.uid() = id);
-DROP POLICY IF EXISTS "Self delete profiles" ON profiles;
-CREATE POLICY "Self delete profiles" ON profiles FOR DELETE USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Users update own" ON profiles;
+CREATE POLICY "Users update own" ON profiles FOR UPDATE USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Users insert own" ON profiles;
+CREATE POLICY "Users insert own" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
-ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public announcements" ON announcements;
-CREATE POLICY "Public announcements" ON announcements FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Admin insert announcements" ON announcements;
-CREATE POLICY "Admin insert announcements" ON announcements FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'super_admin')));
-DROP POLICY IF EXISTS "Admin update announcements" ON announcements;
-CREATE POLICY "Admin update announcements" ON announcements FOR UPDATE USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'super_admin')));
-DROP POLICY IF EXISTS "Admin delete announcements" ON announcements;
-CREATE POLICY "Admin delete announcements" ON announcements FOR DELETE USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'super_admin')));
-
-ALTER TABLE events ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public events" ON events;
-CREATE POLICY "Public events" ON events FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Admin insert events" ON events;
-CREATE POLICY "Admin insert events" ON events FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'super_admin')));
-DROP POLICY IF EXISTS "Admin update events" ON events;
-CREATE POLICY "Admin update events" ON events FOR UPDATE USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'super_admin')));
-DROP POLICY IF EXISTS "Admin delete events" ON events;
-CREATE POLICY "Admin delete events" ON events FOR DELETE USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'super_admin')));
-
-ALTER TABLE user_documents ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Users own docs" ON user_documents;
-CREATE POLICY "Users own docs" ON user_documents FOR SELECT USING (auth.uid() = user_id);
-DROP POLICY IF EXISTS "Admins all docs" ON user_documents;
-CREATE POLICY "Admins all docs" ON user_documents FOR SELECT USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'super_admin')));
-DROP POLICY IF EXISTS "Users insert docs" ON user_documents;
-CREATE POLICY "Users insert docs" ON user_documents FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public alerts" ON alerts;
-CREATE POLICY "Public alerts" ON alerts FOR SELECT USING (true);
+-- Alerts
+DROP POLICY IF EXISTS "Public read alerts" ON alerts;
+CREATE POLICY "Public read alerts" ON alerts FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Admin manage alerts" ON alerts;
 CREATE POLICY "Admin manage alerts" ON alerts FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'super_admin')));
 
--- Storage Policies
-DROP POLICY IF EXISTS "Public Profiles" ON storage.objects;
-CREATE POLICY "Public Profiles" ON storage.objects FOR SELECT USING (bucket_id = 'profile_images');
-DROP POLICY IF EXISTS "Auth Upload Profiles" ON storage.objects;
-CREATE POLICY "Auth Upload Profiles" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'profile_images' AND auth.role() = 'authenticated');
-DROP POLICY IF EXISTS "Auth Update Profiles" ON storage.objects;
-CREATE POLICY "Auth Update Profiles" ON storage.objects FOR UPDATE USING (bucket_id = 'profile_images' AND auth.uid() = owner);
+-- Content
+DROP POLICY IF EXISTS "Public read content" ON announcements;
+CREATE POLICY "Public read content" ON announcements FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admin manage announcements" ON announcements;
+CREATE POLICY "Admin manage announcements" ON announcements FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'super_admin')));
 
-DROP POLICY IF EXISTS "Public Content" ON storage.objects;
-CREATE POLICY "Public Content" ON storage.objects FOR SELECT USING (bucket_id = 'content_images');
-DROP POLICY IF EXISTS "Auth Upload Content" ON storage.objects;
-CREATE POLICY "Auth Upload Content" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'content_images' AND auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Public read events" ON events;
+CREATE POLICY "Public read events" ON events FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admin manage events" ON events;
+CREATE POLICY "Admin manage events" ON events FOR ALL USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'super_admin')));
 
-DROP POLICY IF EXISTS "Auth Upload Docs" ON storage.objects;
-CREATE POLICY "Auth Upload Docs" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'documents' AND auth.role() = 'authenticated');
-DROP POLICY IF EXISTS "Auth Select Docs" ON storage.objects;
-CREATE POLICY "Auth Select Docs" ON storage.objects FOR SELECT USING (bucket_id = 'documents' AND auth.uid() = owner);
+-- Documents
+DROP POLICY IF EXISTS "Users see own docs" ON user_documents;
+CREATE POLICY "Users see own docs" ON user_documents FOR SELECT USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'super_admin')));
+DROP POLICY IF EXISTS "Users insert docs" ON user_documents;
+CREATE POLICY "Users insert docs" ON user_documents FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Storage Policies (Simplified)
+DROP POLICY IF EXISTS "Public View" ON storage.objects;
+CREATE POLICY "Public View" ON storage.objects FOR SELECT USING (bucket_id IN ('profile_images', 'content_images', 'documents'));
+DROP POLICY IF EXISTS "Auth Upload" ON storage.objects;
+CREATE POLICY "Auth Upload" ON storage.objects FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Auth Update" ON storage.objects;
+CREATE POLICY "Auth Update" ON storage.objects FOR UPDATE USING (auth.role() = 'authenticated');
 `;

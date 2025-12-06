@@ -1,4 +1,5 @@
 
+
 export type LanguageCode = 'RO' | 'EN' | 'IT' | 'ES' | 'FR' | 'DE' | 'PT' | 'HU' | 'TR';
 
 export type UserRole = 'user' | 'admin' | 'super_admin';

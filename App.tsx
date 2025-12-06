@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Home, Book, Send, HelpCircle, Settings, User, 
@@ -124,7 +126,7 @@ const AutoScrollSection = ({ children, interval = 5000 }: { children?: React.Rea
     return (
         <div 
             ref={scrollRef} 
-            className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x"
+            className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x hide-scrollbar"
             onTouchStart={() => setPaused(true)}
             onTouchEnd={() => setPaused(false)}
             onMouseEnter={() => setPaused(true)}
@@ -190,7 +192,7 @@ const Header = ({ currentLang, setLang, onProfileClick, onSettingsClick, onSearc
 };
 
 const BottomNav = ({ currentView, setView, t }: any) => {
-  // Navigation now persistent for all screens
+  // Navigation persistent for all screens
   const navItems = [
     { view: 'HOME', icon: Home, label: t('nav_home') },
     { view: 'SERVICES', icon: Book, label: t('nav_services') },
@@ -637,6 +639,8 @@ const SettingsScreen = ({ textSize, setTextSize, theme, setTheme, setView, notif
 
           <div className="space-y-2">
              <Button variant="ghost" fullWidth onClick={() => alert("Email: contact@consularo.app")} className="justify-start bg-white border border-gray-100">{t('settings_contact')}</Button>
+             <Button variant="ghost" fullWidth onClick={() => setView('INFO')} className="justify-start bg-white border border-gray-100">{t('settings_terms')}</Button>
+             <Button variant="ghost" fullWidth onClick={() => setView('INFO')} className="justify-start bg-white border border-gray-100">{t('settings_privacy')}</Button>
           </div>
       </div> 
     );
@@ -894,7 +898,7 @@ const App = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
-  const [selectedItem, setSelectedItem] = useState<Announcement | EventItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<Announcement | EventItem | AlertItem | null>(null);
 
   // Auth State
   const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
@@ -1134,7 +1138,7 @@ const App = () => {
                          <h3 className="text-lg font-bold text-red-700 flex items-center gap-2 mb-3"><AlertTriangle className="w-5 h-5" /> {t('alerts_section')}</h3>
                          <AutoScrollSection interval={4000}>
                             {activeAlerts.map(alert => (
-                                <div key={alert.id} className="snap-center min-w-[300px] bg-white rounded-xl shadow-md p-3 flex gap-3 border border-gray-100 cursor-pointer hover:shadow-lg transition-all">
+                                <div key={alert.id} onClick={() => setSelectedItem(alert)} className="snap-center min-w-[300px] bg-white rounded-xl shadow-md p-3 flex gap-3 border border-gray-100 cursor-pointer hover:shadow-lg transition-all">
                                      <div className={`w-24 h-24 ${getAlertColor(alert.type)} rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center`}>
                                          {getAlertIcon(alert.type)}
                                      </div>
@@ -1228,6 +1232,24 @@ const App = () => {
             return (
                 <div className="p-4 pb-24 space-y-4">
                     <h2 className="text-2xl font-bold text-ro-blue mb-4">{t('nav_announcements')}</h2>
+                    {activeAlerts.length > 0 && (
+                        <div className="mb-6 space-y-4">
+                             <h3 className="text-lg font-bold text-red-700 flex items-center gap-2 mb-2"><AlertTriangle className="w-5 h-5" /> {t('alerts_section')}</h3>
+                             {activeAlerts.map(alert => (
+                                <div key={alert.id} onClick={() => setSelectedItem(alert)} className="bg-white rounded-xl shadow-sm p-3 flex gap-3 border border-red-100 cursor-pointer hover:shadow-md transition-all">
+                                     <div className={`w-24 h-24 ${getAlertColor(alert.type)} rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center`}>
+                                         {getAlertIcon(alert.type)}
+                                     </div>
+                                     <div className="flex-1 flex flex-col justify-center">
+                                         <h4 className="font-bold text-gray-800 line-clamp-2 text-sm">{alert.title}</h4>
+                                         <p className="text-xs text-gray-600 mt-1 line-clamp-2">{alert.message}</p>
+                                     </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <h3 className="text-lg font-bold text-gray-800 mt-6 mb-2">{t('title_announcements')}</h3>
                     {announcements.length === 0 ? (
                     <div className="text-gray-400 text-sm italic w-full text-center py-4">Nu există anunțuri active.</div>
                     ) : (
@@ -1304,21 +1326,36 @@ const App = () => {
            isOpen={!!selectedItem} 
            onClose={() => setSelectedItem(null)} 
            title={selectedItem?.title} 
-           imageUrl={selectedItem?.imageUrl}
+           imageUrl={'imageUrl' in (selectedItem || {}) ? (selectedItem as any).imageUrl : undefined}
         >
            {selectedItem && (
               <div className="space-y-4">
-                 <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <Calendar className="w-4 h-4"/> 
-                    <span>{selectedItem.date} {(selectedItem.endDate) ? ` - ${selectedItem.endDate}` : ''}</span>
-                 </div>
-                 {'location' in selectedItem && (
-                    <div className="flex items-center gap-2 text-sm text-ro-blue font-semibold">
-                       <MapPinIcon className="w-4 h-4"/> 
-                       <span>{(selectedItem as EventItem).location}</span>
-                    </div>
+                 {'type' in selectedItem ? (
+                     // Alert Detail View
+                     <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                         <div className="flex items-center gap-2 mb-2 font-bold text-red-800">
+                            {getAlertIcon(selectedItem.type)}
+                            <span>Alertă {selectedItem.type.toUpperCase()}</span>
+                         </div>
+                         <p className="text-gray-800 whitespace-pre-line">{selectedItem.message}</p>
+                         {selectedItem.country && <div className="mt-2 text-xs text-gray-500">Target: {selectedItem.country}</div>}
+                     </div>
+                 ) : (
+                     // Announcement/Event Detail View
+                     <>
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                            <Calendar className="w-4 h-4"/> 
+                            <span>{(selectedItem as any).date} {(selectedItem as any).endDate ? ` - ${(selectedItem as any).endDate}` : ''}</span>
+                        </div>
+                        {'location' in selectedItem && (
+                            <div className="flex items-center gap-2 text-sm text-ro-blue font-semibold">
+                            <MapPinIcon className="w-4 h-4"/> 
+                            <span>{(selectedItem as EventItem).location}</span>
+                            </div>
+                        )}
+                        <p className="text-gray-700 leading-relaxed whitespace-pre-line">{(selectedItem as any).description}</p>
+                     </>
                  )}
-                 <p className="text-gray-700 leading-relaxed whitespace-pre-line">{selectedItem.description}</p>
                  <Button fullWidth onClick={() => setSelectedItem(null)}>Închide</Button>
               </div>
            )}
