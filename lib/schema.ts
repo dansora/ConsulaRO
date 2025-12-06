@@ -69,7 +69,7 @@ BEGIN
     new.email,
     COALESCE(extracted_first_name, ''),
     COALESCE(extracted_last_name, ''),
-    new.raw_user_meta_data->>'avatar_url', -- Google/FB trimit avatar aici
+    COALESCE(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture'), -- Google trimite picture, altii avatar_url
     'user'
   )
   ON CONFLICT (id) DO UPDATE SET

@@ -838,12 +838,22 @@ const App = () => {
       if (session) fetchProfile(session.user.id);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
          fetchProfile(session.user.id);
       } else {
          setUser(null);
          if(view !== 'SPLASH') setView('AUTH');
+      }
+
+      // Handle OAuth error in URL hash
+      if (event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+          const hash = window.location.hash;
+          if (hash && hash.includes('error_description')) {
+              const params = new URLSearchParams(hash.substring(1));
+              const errorDescription = params.get('error_description');
+              if (errorDescription) alert(`Eroare autentificare: ${errorDescription.replace(/\+/g, ' ')}`);
+          }
       }
     });
 
@@ -876,11 +886,25 @@ const App = () => {
         // 2. Fallback: If auth succeeded but profile missing (trigger failed/delayed), create it manually.
         const { data: userData } = await supabase.auth.getUser();
         if(userData.user) {
+             const meta = userData.user.user_metadata || {};
+             let first = meta.first_name || '';
+             let last = meta.last_name || '';
+             
+             // Fallback for Google/Facebook who might send full_name
+             if (!first && meta.full_name) {
+                 const parts = meta.full_name.split(' ');
+                 first = parts[0];
+                 last = parts.slice(1).join(' ');
+             }
+             
+             const avatar = meta.avatar_url || meta.picture || null;
+
              const newProfile = {
                  id: userId,
                  email: userData.user.email,
-                 first_name: userData.user.user_metadata?.first_name || '',
-                 last_name: userData.user.user_metadata?.last_name || '',
+                 first_name: first,
+                 last_name: last,
+                 avatar_url: avatar,
                  role: 'user'
              };
              // Use upsert to handle race conditions with trigger
@@ -923,7 +947,11 @@ const App = () => {
         const { error } = await supabase.auth.signInWithOAuth({
             provider,
             options: {
-                redirectTo: window.location.origin
+                redirectTo: window.location.origin,
+                queryParams: {
+                    access_type: 'offline',
+                    prompt: 'consent',
+                },
             }
         });
         if (error) throw error;
